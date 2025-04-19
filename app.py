@@ -51,6 +51,11 @@ try:
 except ValueError:
     st.error("⚠️ Formato de data inválido. Utilize DD/MM/AAAA.")
 
+dias_mes = {
+    "Janeiro": 31, "Fevereiro": 28, "Março": 31, "Abril": 30, "Maio": 31, "Junho": 30,
+    "Julho": 31, "Agosto": 31, "Setembro": 30, "Outubro": 31, "Novembro": 30, "Dezembro": 31
+}
+
 if dias_manual > 0:
     dias = dias_manual
     origem_dias = "(introduzido manualmente)"
@@ -62,10 +67,6 @@ elif data_inicio and data_fim:
         dias = 0
         origem_dias = "⚠️ A data final não pode ser anterior à inicial."
 else:
-    dias_mes = {
-        "Janeiro": 31, "Fevereiro": 29, "Março": 31, "Abril": 30, "Maio": 31, "Junho": 30,
-        "Julho": 31, "Agosto": 31, "Setembro": 30, "Outubro": 31, "Novembro": 30, "Dezembro": 31
-    }
     dias = dias_mes[mes]
     origem_dias = "(dias do mês)"
 
@@ -83,13 +84,20 @@ if opcao_horaria == "Simples":
     consumo["simples"] = st.number_input("Consumo Simples", min_value=0.0, value=158.0)
 
 elif opcao_horaria.startswith("Bi"):
-    consumo["vazio"] = st.number_input("Consumo em Vazio", min_value=0.0, value=63.0)
-    consumo["fora_vazio"] = st.number_input("Consumo em Fora Vazio", min_value=0.0, value=95.0)
+    colA, colB = st.columns(2)
+    with colA:
+        consumo["vazio"] = st.number_input("Consumo em Vazio", min_value=0.0, value=63.0)
+    with colB:
+        consumo["fora_vazio"] = st.number_input("Consumo em Fora Vazio", min_value=0.0, value=95.0)
 
 elif opcao_horaria.startswith("Tri"):
-    consumo["vazio"] = st.number_input("Consumo em Vazio", min_value=0.0, value=63.0)
-    consumo["cheias"] = st.number_input("Consumo em Cheias", min_value=0.0, value=68.0)
-    consumo["ponta"] = st.number_input("Consumo em Ponta", min_value=0.0, value=27.0)
+    colA, colB, colC = st.columns(3)
+    with colA:
+        consumo["vazio"] = st.number_input("Consumo em Vazio", min_value=0.0, value=63.0)
+    with colB:
+        consumo["cheias"] = st.number_input("Consumo em Cheias", min_value=0.0, value=68.0)
+    with colC:
+        consumo["ponta"] = st.number_input("Consumo em Ponta", min_value=0.0, value=27.0)
 
 # --- Checkboxes adicionais ---
 st.subheader("Opções")
@@ -126,3 +134,4 @@ if comparar:
 # --- Total de consumo ---
 total_consumo = sum(consumo.values())
 st.markdown(f"### Total de Consumo: **{total_consumo:.2f} kWh**")
+
