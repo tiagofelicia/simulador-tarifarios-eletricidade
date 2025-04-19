@@ -34,19 +34,33 @@ with col3:
 col4, col5, col6 = st.columns(3)
 
 with col4:
-    data_inicio = st.date_input("Data Inicial", value=None, min_value=datetime.date(2025, 1, 1))
+    data_inicio_str = st.text_input("Data Inicial (DD/MM/AAAA)", value="")
 with col5:
-    data_fim = st.date_input("Data Final", value=None, min_value=datetime.date(2025, 1, 1))
+    data_fim_str = st.text_input("Data Final (DD/MM/AAAA)", value="")
 with col6:
     dias_manual = st.number_input("Número de Dias (manual)", min_value=0, value=0, step=1)
 
 # --- Cálculo dos dias ---
+data_inicio = data_fim = None
+
+try:
+    if data_inicio_str:
+        data_inicio = datetime.datetime.strptime(data_inicio_str, "%d/%m/%Y").date()
+    if data_fim_str:
+        data_fim = datetime.datetime.strptime(data_fim_str, "%d/%m/%Y").date()
+except ValueError:
+    st.error("⚠️ Formato de data inválido. Utilize DD/MM/AAAA.")
+
 if dias_manual > 0:
     dias = dias_manual
     origem_dias = "(introduzido manualmente)"
-elif data_inicio and data_fim and data_inicio <= data_fim:
-    dias = (data_fim - data_inicio).days + 1
-    origem_dias = "(calculado pelas datas)"
+elif data_inicio and data_fim:
+    if data_fim >= data_inicio:
+        dias = (data_fim - data_inicio).days + 1
+        origem_dias = "(calculado pelas datas)"
+    else:
+        dias = 0
+        origem_dias = "⚠️ A data final não pode ser anterior à inicial."
 else:
     dias_mes = {
         "Janeiro": 31, "Fevereiro": 29, "Março": 31, "Abril": 30, "Maio": 31, "Junho": 30,
