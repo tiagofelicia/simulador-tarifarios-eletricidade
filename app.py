@@ -34,12 +34,28 @@ with col3:
 col4, col5, col6 = st.columns(3)
 
 with col4:
-    data_inicio = st.date_input("Data Inicial", value=datetime.date(2025, 1, 1))
+    data_inicio = st.date_input("Data Inicial", value=None, min_value=datetime.date(2025, 1, 1))
 with col5:
-    data_fim = st.date_input("Data Final", value=datetime.date(2025, 1, 31))
+    data_fim = st.date_input("Data Final", value=None, min_value=datetime.date(2025, 1, 1))
 with col6:
+    dias_manual = st.number_input("Número de Dias (manual)", min_value=0, value=0, step=1)
+
+# --- Cálculo dos dias ---
+if dias_manual > 0:
+    dias = dias_manual
+    origem_dias = "(introduzido manualmente)"
+elif data_inicio and data_fim and data_inicio <= data_fim:
     dias = (data_fim - data_inicio).days + 1
-    st.markdown(f"**Dias calculados:** {dias}")
+    origem_dias = "(calculado pelas datas)"
+else:
+    dias_mes = {
+        "Janeiro": 31, "Fevereiro": 29, "Março": 31, "Abril": 30, "Maio": 31, "Junho": 30,
+        "Julho": 31, "Agosto": 31, "Setembro": 30, "Outubro": 31, "Novembro": 30, "Dezembro": 31
+    }
+    dias = dias_mes[mes]
+    origem_dias = "(dias do mês)"
+
+st.markdown(f"**Dias considerados:** {dias} {origem_dias}")
 
 # --- Consumo conforme tipo tarifário ---
 st.subheader("Consumo (kWh)")
