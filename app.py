@@ -71,6 +71,10 @@ else:
 
 st.markdown(f"**Dias considerados:** {dias} {origem_dias}")
 
+# --- Campo para valor MIBEL ---
+st.subheader("Valor OMIE/MIBEL")
+valor_mibel = st.number_input("Introduzir valor MIBEL/OMIE (€/MWh)", min_value=0.0, step=0.01)
+
 # --- Consumo conforme tipo tarifário ---
 st.subheader("Consumo (kWh)")
 
@@ -99,9 +103,6 @@ with col9:
 
 familia_numerosa = st.checkbox("Família Numerosa")
 comparar = st.checkbox("Comparar 'O Meu Tarifário?'")
-
-# --- Campo para valor MIBEL ---
-valor_mibel = st.number_input("Introduzir valor MIBEL/OMIE (€/MWh)", min_value=0.0, step=0.01)
 
 # --- Comparação personalizada ---
 if comparar:
