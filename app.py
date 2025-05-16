@@ -2349,12 +2349,12 @@ if not df_resultados.empty:
                 // console.log(`AgGrid Style - Nome: ${{nomeExibir}}, Tipo Recebido: ${{tipoTarifario}}`);
 
                 if (nomeExibir === 'O Meu Tarifário') {{
-                    return {{ backgroundColor: 'red', color: 'white', fontWeight: 'bold' }};
+                    return {{ backgroundColor: 'red', color: 'white', fontWeight: 'bold', textAlign: 'center' }};
                 }} else if (tipoTarifario === 'Indexado Média' || tipoTarifario === 'Indexado quarto-horário') {{
-                    return {{ backgroundColor: '{cor_fundo_indexado_css}', color: '{cor_texto_indexado_css}' }};
+                    return {{ backgroundColor: '{cor_fundo_indexado_css}', color: '{cor_texto_indexado_css}', textAlign: 'center' }};
                 }} else {{
                     // Para tarifários fixos ou outros não especificados
-                    return {{}}; // Retorna um objeto de estilo vazio em vez de null
+                    return {{textAlign: 'center'}}; // Retorna um objeto de estilo vazio em vez de null
                 }}
             }}
             return {{}}; // Default também um objeto vazio
@@ -2363,7 +2363,7 @@ if not df_resultados.empty:
         
         # --- Configuração Coluna Nome Tarifário com Link e Tooltip ---
         # ... (link_tooltip_renderer_js) ...
-        gb.configure_column(field='NomeParaExibir', headerName='Nome Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=150, flex=2, filter='agTextColumnFilter',
+        gb.configure_column(field='NomeParaExibir', headerName='Nome Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=100, flex=2, filter='agTextColumnFilter',
     cellStyle=cell_style_nome_tarifario_js)
         if 'LinkAdesao' in df_resultados_para_aggrid.columns: # Já verificado acima, mas boa prática
             gb.configure_column(field='LinkAdesao', hide=True) # Desativar filtro explicitamente
@@ -2391,7 +2391,7 @@ if not df_resultados.empty:
             const colName = params.colDef.field;
             const value = parseFloat(params.value);
             const minMaxConfig = {min_max_data_json_string}; //
-            let style = {{}}; // Estilo default
+            let style = {{ textAlign: 'center' }};
 
             if (isNaN(value) || !minMaxConfig[colName]) {{
                 return style; // Sem cor para NaN ou se não houver config min/max
@@ -2597,7 +2597,7 @@ if not df_resultados.empty:
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=50, # Ajuste conforme necessário
+                minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2661,7 +2661,7 @@ if not df_resultados.empty:
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=50, # Ajuste conforme necessário
+                minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2725,7 +2725,7 @@ if not df_resultados.empty:
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=50, # Ajuste conforme necessário
+                minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2789,7 +2789,7 @@ if not df_resultados.empty:
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=50, # Ajuste conforme necessário
+                minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2853,7 +2853,7 @@ if not df_resultados.empty:
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=50, # Ajuste conforme necessário
+                minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -3148,7 +3148,8 @@ if not df_resultados.empty:
                     minWidth=min_w,
                     flex=fx,
                     filter='agSetColumnFilter',
-                    filterParams=set_filter_params
+                    filterParams=set_filter_params,
+                    cellStyle={'textAlign': 'center'}
                 )
 
         # --- Configuração Coluna Comercializador (Text Filter) ---
@@ -3158,7 +3159,8 @@ if not df_resultados.empty:
                 headerName="Comercializador",
                 minWidth=50,
                 flex=1,
-                filter='agTextColumnFilter'     # Especificar Text Filter
+                filter='agTextColumnFilter',
+                cellStyle={'textAlign': 'center'}
             )
 
 
