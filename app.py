@@ -2201,6 +2201,7 @@ if comparar_indexados:
 
 # --- Processamento final e exibição da tabela de resultados ---
 st.markdown("---")
+vista_simplificada = st.checkbox("📱 Ativar vista simplificada (para ecrãs menores)", key="chk_vista_simplificada")
 st.subheader("💰 Tarifários de Eletricidade")
 st.write("Valores unitários sem IVA e Custo Total Estimado com todos os componentes, taxas e impostos")
 
@@ -2214,14 +2215,26 @@ if meu_tarifario_ativo and 'meu_tarifario_calculado' in st.session_state:
 
 df_resultados = pd.DataFrame(final_results_list)
 
-if not df_resultados.empty: # Condição principal
-    # Mapear colunas de exibição desejadas
-    col_order_visivel_aggrid = ['NomeParaExibir', 'LinkAdesao', 'Tipo', 'Comercializador', 'Segmento', 'Faturação', 'Pagamento']
-    col_order_visivel_aggrid.extend([col for col in df_resultados.columns if 'Preço Energia' in col])
-    col_order_visivel_aggrid.extend(['Preço Potência (€/dia)', 'Custo Total Estimado (€)'])
+if not df_resultados.empty:
+    if vista_simplificada:
+        # Definir a ordem específica para a vista simplificada
+        colunas_base_simplificada = ['NomeParaExibir', 'Custo Total Estimado (€)']
+        colunas_energia_existentes = [col for col in df_resultados.columns if 'Preço Energia' in col]
+        coluna_potencia = 'Preço Potência (€/dia)'
+        col_order_visivel_aggrid = colunas_base_simplificada + colunas_energia_existentes # colunas_base_simplificada precisa ser definida antes
+        if coluna_potencia in df_resultados.columns:
+            col_order_visivel_aggrid.append(coluna_potencia)
 
-    # Garantir que apenas colunas existentes em df_resultados são selecionadas para exibição
-    colunas_visiveis_presentes = [col for col in col_order_visivel_aggrid if col in df_resultados.columns]
+        colunas_visiveis_presentes = [col for col in col_order_visivel_aggrid if col in df_resultados.columns]
+
+    else:
+        # Mapear colunas de exibição desejadas
+        col_order_visivel_aggrid = ['NomeParaExibir', 'LinkAdesao', 'Custo Total Estimado (€)']
+        col_order_visivel_aggrid.extend([col for col in df_resultados.columns if 'Preço Energia' in col])
+        col_order_visivel_aggrid.extend(['Preço Potência (€/dia)'])
+        col_order_visivel_aggrid.extend(['Tipo', 'Comercializador', 'Segmento', 'Faturação', 'Pagamento'])
+        colunas_visiveis_presentes = [col for col in col_order_visivel_aggrid if col in df_resultados.columns]
+
 
     # --- NOVO: Definir colunas necessárias para os dados dos tooltips ---
     colunas_dados_tooltip = [
@@ -2258,13 +2271,15 @@ if not df_resultados.empty: # Condição principal
         'tt_cte_subtotal_civa','tt_cte_desc_finais_valor','tt_cte_acres_finais_valor'
     ]
 
+    # Colunas que DEVEM estar presentes nos dados do AgGrid para lógica JS, mesmo que ocultas visualmente
+    colunas_essenciais_para_js = ['Tipo', 'NomeParaExibir', 'LinkAdesao'] # Adicione outras se necessário
+    colunas_essenciais_para_js.extend(colunas_dados_tooltip) # as de tooltip já estão aqui
 
-        # Garantir que apenas colunas de tooltip existentes em df_resultados são selecionadas
-    colunas_tooltip_presentes = [col for col in colunas_dados_tooltip if col in df_resultados.columns]
-
-    # Combinar colunas visíveis com colunas de dados para tooltip, evitando duplicados
-    # e garantindo que todas as colunas necessárias para o AgGrid (visíveis e de dados) estão lá.
-    colunas_para_aggrid_final = list(dict.fromkeys(colunas_visiveis_presentes + colunas_tooltip_presentes))
+    # Unir colunas visíveis e essenciais para JS, removendo duplicados e mantendo a ordem das visíveis primeiro
+    colunas_para_aggrid_final = list(dict.fromkeys(colunas_visiveis_presentes + colunas_essenciais_para_js))
+    
+    # Filtrar para garantir que todas as colunas em colunas_para_aggrid_final existem em df_resultados
+    colunas_para_aggrid_final = [col for col in colunas_para_aggrid_final if col in df_resultados.columns]
 
 
     # Verifica se as colunas essenciais 'NomeParaExibir' e 'LinkAdesao' existem
@@ -2348,7 +2363,7 @@ if not df_resultados.empty: # Condição principal
         
         # --- Configuração Coluna Nome Tarifário com Link e Tooltip ---
         # ... (link_tooltip_renderer_js) ...
-        gb.configure_column(field='NomeParaExibir', headerName='Nome Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=350, flex=2, filter='agTextColumnFilter',
+        gb.configure_column(field='NomeParaExibir', headerName='Nome Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=150, flex=2, filter='agTextColumnFilter',
     cellStyle=cell_style_nome_tarifario_js)
         if 'LinkAdesao' in df_resultados_para_aggrid.columns: # Já verificado acima, mas boa prática
             gb.configure_column(field='LinkAdesao', hide=True) # Desativar filtro explicitamente
@@ -2582,7 +2597,7 @@ if not df_resultados.empty: # Condição principal
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=100, # Ajuste conforme necessário
+                minWidth=50, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2646,7 +2661,7 @@ if not df_resultados.empty: # Condição principal
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=100, # Ajuste conforme necessário
+                minWidth=50, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2710,7 +2725,7 @@ if not df_resultados.empty: # Condição principal
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=100, # Ajuste conforme necessário
+                minWidth=50, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2774,7 +2789,7 @@ if not df_resultados.empty: # Condição principal
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=100, # Ajuste conforme necessário
+                minWidth=50, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -2838,7 +2853,7 @@ if not df_resultados.empty: # Condição principal
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=100, # Ajuste conforme necessário
+                minWidth=50, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -3108,7 +3123,7 @@ if not df_resultados.empty: # Condição principal
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_custo_total_js, # <--- SEU NOVO TOOLTIP GETTER
                 tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=100, # Ajuste conforme necessário
+                minWidth=50, # Ajuste conforme necessário
                 flex=1
             )
 
@@ -3141,7 +3156,7 @@ if not df_resultados.empty: # Condição principal
             gb.configure_column(
                 "Comercializador",
                 headerName="Comercializador",
-                minWidth=150,
+                minWidth=50,
                 flex=1,
                 filter='agTextColumnFilter'     # Especificar Text Filter
             )
@@ -3188,7 +3203,7 @@ if not df_resultados.empty: # Condição principal
                     type=["numericColumn", "numberColumnFilter"], # Isto já define o filtro numérico
                     valueFormatter=js_value_formatter_para_coluna, # USAR O JsCode AQUI
                     cellStyle=cell_style_cores_js, # O seu cell_style_cores_js deve estar correto
-                    minWidth=160,
+                    minWidth=50,
                     flex=1
                 )
 
@@ -3201,6 +3216,19 @@ if not df_resultados.empty: # Condição principal
             return null; // Sem estilo especial para outras linhas
         }
         """)
+
+        # Ocultar 'Tipo' e 'LinkAdesao' na vista simplificada se não estiverem em colunas_visiveis_presentes
+        if vista_simplificada:
+            if 'Tipo' not in colunas_visiveis_presentes and 'Tipo' in df_resultados_para_aggrid.columns:
+                gb.configure_column(field='Tipo', hide=True)
+            if 'LinkAdesao' not in colunas_visiveis_presentes and 'LinkAdesao' in df_resultados_para_aggrid.columns:
+                gb.configure_column(field='LinkAdesao', hide=True)
+            # Oculte outras colunas que estão nos dados mas não são visíveis na vista simplificada
+            colunas_desktop_a_ocultar_na_vista_movel = ['Segmento', 'Faturação', 'Pagamento', 'Comercializador'] # Exemplo
+            for col_ocultar in colunas_desktop_a_ocultar_na_vista_movel:
+                if col_ocultar not in colunas_visiveis_presentes and col_ocultar in df_resultados_para_aggrid.columns:
+                     gb.configure_column(field=col_ocultar, hide=True)
+
 
         # Ocultar colunas de dados de tooltip
         colunas_de_dados_tooltip_a_ocultar = [
