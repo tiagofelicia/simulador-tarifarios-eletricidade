@@ -359,7 +359,7 @@ with col6:
 
     dias_manual_input_val = st.number_input("Número de Dias (manual)", min_value=0,
                                         value=st.session_state.get('dias_manual_val', dias_default_calculado),
-                                        step=1, key="dias_manual_input_key", help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos")
+                                        step=1, key="dias_manual_input_key", help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos nos tarifários indexados")
     st.session_state['dias_manual_val'] = dias_manual_input_val
 
     if pd.isna(dias_manual_input_val) or dias_manual_input_val <= 0:
@@ -368,6 +368,45 @@ with col6:
         dias = int(dias_manual_input_val)
 st.write(f"Dias considerados: **{dias} dias**")
 
+
+# Ler e Processar a Constante Data_Valores_OMIE
+data_valores_omie_dt = None
+nota_omie = " (Info OMIE Indisp.)" # Default se a data não puder ser processada
+
+constante_row_data_omie = CONSTANTES[CONSTANTES['constante'] == 'Data_Valores_OMIE']
+if not constante_row_data_omie.empty:
+    valor_raw = constante_row_data_omie['valor_unitário'].iloc[0]
+    if pd.notna(valor_raw):
+        try:
+            # Pandas geralmente lê datas como datetime64[ns] que se tornam Timestamp
+            if isinstance(valor_raw, (datetime.datetime, pd.Timestamp)):
+                data_valores_omie_dt = valor_raw.date() # Converter para objeto date
+            else: # Tentar converter de outros formatos (ex: string)
+                # Tentar converter para pd.Timestamp primeiro, depois para date
+                timestamp_convertido = pd.to_datetime(valor_raw, errors='coerce')
+                if pd.notna(timestamp_convertido):
+                    data_valores_omie_dt = timestamp_convertido.date()
+            
+            if pd.isna(data_valores_omie_dt): # Se a conversão resultou em NaT (Not a Time)
+                data_valores_omie_dt = None
+                st.warning(f"Não foi possível converter 'Data_Valores_OMIE' para uma data válida: {valor_raw}")
+        except Exception as e:
+            st.warning(f"Erro ao processar 'Data_Valores_OMIE' ('{valor_raw}'): {e}")
+            data_valores_omie_dt = None # Garantir que fica None em caso de erro
+    else:
+        st.warning("Valor para 'Data_Valores_OMIE' está vazio na folha Constantes.")
+else:
+    st.warning("Constante 'Data_Valores_OMIE' não encontrada na folha Constantes.")
+
+# Determinar a nota para os inputs OMIE
+# 'data_fim' já deve ser um objeto datetime.date
+if data_valores_omie_dt and isinstance(data_fim, datetime.date):
+    if data_fim <= data_valores_omie_dt:
+        nota_omie = " (Média Final)"
+    else:
+        nota_omie = " (Média com Futuros)"
+# Se data_valores_omie_dt for None, a nota_omie permanecerá "(Info OMIE Indisp.)"
+# FIM - Ler e Processar a Constante Data_Valores_OMIE
 
 # --- LÓGICA DE RESET DOS INPUTS OMIE ---
 # Gerar uma chave única para os parâmetros que afetam os defaults OMIE
@@ -439,7 +478,8 @@ else:
 
 if opcao_horaria.lower() == "simples":
     default_s = round(omie_medios_calculados['S'], 2)
-    omie_s_manual = st.number_input("Valor OMIE (€/MWh) - Simples", value=st.session_state.get('omie_s_input_field', default_s), step=0.01, key="omie_s_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Se quiser simular outro qualquer valor do OMIE, deve colocar o valor desejado.")
+    label_s_completo = f"Valor OMIE (€/MWh) - Simples{nota_omie}"    
+    omie_s_manual = st.number_input(label_s_completo, value=st.session_state.get('omie_s_input_field', default_s), step=0.01, key="omie_s_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
     st.session_state.omie_s_input_field = omie_s_manual
     if round(omie_s_manual, 2) != default_s: st.session_state.omie_foi_editado_manualmente['S'] = True
     elif 'S' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['S'] = False
@@ -449,13 +489,15 @@ elif opcao_horaria.lower().startswith("bi"):
     default_v = round(omie_medios_calculados['V'], 2)
     default_f = round(omie_medios_calculados['F'], 2)
     with col_omie1:
-        omie_v_manual = st.number_input("Valor OMIE (€/MWh) - Vazio", value=st.session_state.get('omie_v_input_field', default_v), step=0.01, key="omie_v_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Se quiser simular outro qualquer valor do OMIE, deve colocar o valor desejado.")
+        label_v_completo = f"Valor OMIE (€/MWh) - Vazio{nota_omie}"
+        omie_v_manual = st.number_input(label_v_completo, value=st.session_state.get('omie_v_input_field', default_v), step=0.01, key="omie_v_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
         st.session_state.omie_v_input_field = omie_v_manual
         if round(omie_v_manual, 2) != default_v: st.session_state.omie_foi_editado_manualmente['V'] = True
         elif 'V' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['V'] = False
 
     with col_omie2:
-        omie_f_manual = st.number_input("Valor OMIE (€/MWh) - Fora Vazio", value=st.session_state.get('omie_f_input_field', default_f), step=0.01, key="omie_f_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Se quiser simular outro qualquer valor do OMIE, deve colocar o valor desejado.")
+        label_f_completo = f"Valor OMIE (€/MWh) - Fora Vazio{nota_omie}"
+        omie_f_manual = st.number_input(label_f_completo, value=st.session_state.get('omie_f_input_field', default_f), step=0.01, key="omie_f_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
         st.session_state.omie_f_input_field = omie_f_manual
         if round(omie_f_manual, 2) != default_f: st.session_state.omie_foi_editado_manualmente['F'] = True
         elif 'F' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['F'] = False
@@ -467,17 +509,20 @@ elif opcao_horaria.lower().startswith("tri"):
     default_c = round(omie_medios_calculados['C'], 2)
     default_p = round(omie_medios_calculados['P'], 2)
     with col_omie1:
-        omie_v_manual = st.number_input("Valor OMIE (€/MWh) - Vazio", value=st.session_state.get('omie_v_input_field', default_v), step=0.01, key="omie_v_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Se quiser simular outro qualquer valor do OMIE, deve colocar o valor desejado.")
+        label_v_completo = f"Valor OMIE (€/MWh) - Vazio{nota_omie}"
+        omie_v_manual = st.number_input(label_v_completo, value=st.session_state.get('omie_v_input_field', default_v), step=0.01, key="omie_v_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
         st.session_state.omie_v_input_field = omie_v_manual
         if round(omie_v_manual, 2) != default_v: st.session_state.omie_foi_editado_manualmente['V'] = True
         elif 'V' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['V'] = False
     with col_omie2:
-        omie_c_manual = st.number_input("Valor OMIE (€/MWh) - Cheias", value=st.session_state.get('omie_c_input_field', default_c), step=0.01, key="omie_c_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Se quiser simular outro qualquer valor do OMIE, deve colocar o valor desejado.")
+        label_c_completo = f"Valor OMIE (€/MWh) - Cheias{nota_omie}"
+        omie_c_manual = st.number_input(label_c_completo, value=st.session_state.get('omie_c_input_field', default_c), step=0.01, key="omie_c_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
         st.session_state.omie_c_input_field = omie_c_manual
         if round(omie_c_manual, 2) != default_c: st.session_state.omie_foi_editado_manualmente['C'] = True
         elif 'C' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['C'] = False
     with col_omie3:
-        omie_p_manual = st.number_input("Valor OMIE (€/MWh) - Ponta", value=st.session_state.get('omie_p_input_field', default_p), step=0.01, key="omie_p_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Se quiser simular outro qualquer valor do OMIE, deve colocar o valor desejado.")
+        label_p_completo = f"Valor OMIE (€/MWh) - Ponta{nota_omie}"
+        omie_p_manual = st.number_input(label_p_completo, value=st.session_state.get('omie_p_input_field', default_p), step=0.01, key="omie_p_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
         st.session_state.omie_p_input_field = omie_p_manual
         if round(omie_p_manual, 2) != default_p: st.session_state.omie_foi_editado_manualmente['P'] = True
         elif 'P' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['P'] = False
@@ -652,7 +697,7 @@ st.write(f"Total Consumo: **{consumo:.0f} kWh**")
 # ... (Restantes inputs: Taxas DGEG/CAV, Consumos, Opções Adicionais, Meu Tarifário) ...
 st.markdown("---")
 # Expander para as opções que são menos alteradas ou mais específicas
-with st.expander("Opções Adicionais de Simulação (Tarifa Social e Parcerias)"):
+with st.expander("Opções Adicionais de Simulação (Tarifa Social e condicionais)"):
     st.markdown("##### Definição de Taxas Mensais")
     col_taxa1, col_taxa2 = st.columns(2)
     with col_taxa1:
@@ -1202,7 +1247,7 @@ if meu_tarifario_ativo:
                 elif p == 'P': periodo_nome = "Ponta"
                 if periodo_nome:
                     # Arredondar aqui para a exibição, se necessário (ex: 4 casas decimais)
-                    valores_energia_meu_exibir_dict[f'Preço Energia {periodo_nome} (€/kWh)'] = round(v_energia, 4)
+                    valores_energia_meu_exibir_dict[f'Energia {periodo_nome} (€/kWh)'] = round(v_energia, 4)
 
         resultado_meu_tarifario_dict = {
             'NomeParaExibir': nome_para_exibir_meu_tarifario,
@@ -1213,8 +1258,8 @@ if meu_tarifario_ativo:
             'Faturação': "-",
             'Pagamento': "-",          
             **valores_energia_meu_exibir_dict,
-            'Preço Potência (€/dia)': round(preco_potencia_final_unitario_sem_iva, 4), # Arredondar para exibição
-            'Custo Total Estimado (€)': round(custo_total_meu_tarifario_com_iva, 2),
+            'Potência (€/dia)': round(preco_potencia_final_unitario_sem_iva, 4), # Arredondar para exibição
+            'Custo Total (€)': round(custo_total_meu_tarifario_com_iva, 2),
             'opcao_horaria_calculada': opcao_horaria, # Importante para a lógica da resposta anterior
             # CAMPOS DO TOOLTIP DA POTÊNCIA MEU
             **componentes_tooltip_potencia_dict_meu,
@@ -1248,6 +1293,7 @@ if not tarifarios_filtrados_fixos.empty:
         tipo_tarifario = tarifario['tipo']
         comercializador_tarifario = tarifario['comercializador']
         link_adesao_tf = tarifario.get('site_adesao')
+        notas_tarifario_tf = tarifario.get('notas', '')
         segmento_tarifario = tarifario.get('segmento', '-')
         faturacao_tarifario = tarifario.get('faturacao', '-')
         pagamento_tarifario = tarifario.get('pagamento', '-')
@@ -1526,7 +1572,7 @@ if not tarifarios_filtrados_fixos.empty:
             elif p == 'C': periodo_nome = "Cheias"
             elif p == 'P': periodo_nome = "Ponta"
             if periodo_nome:
-                valores_energia_exibir_tf[f'Preço Energia {periodo_nome} (€/kWh)'] = round(v_energia_sem_iva, 4)
+                valores_energia_exibir_tf[f'Energia {periodo_nome} (€/kWh)'] = round(v_energia_sem_iva, 4)
 
         preco_potencia_total_final_sem_iva_tf = preco_comercializador_potencia_final_sem_iva_tf + tar_potencia_final_dia_sem_iva_tf
 
@@ -1634,16 +1680,17 @@ if not tarifarios_filtrados_fixos.empty:
 
         # Preparar o dicionário de resultado
         resultado_fixo = {
-            'NomeParaExibir': nome_a_exibir, # Coluna com o nome textual
-            'LinkAdesao': link_adesao_tf,    # Coluna com o URL
+            'NomeParaExibir': nome_a_exibir,
+            'LinkAdesao': link_adesao_tf,
+            'info_notas': notas_tarifario_tf,
             'Tipo': tipo_tarifario,
             'Segmento': segmento_tarifario,
             'Faturação': faturacao_tarifario,
             'Pagamento': pagamento_tarifario,
             'Comercializador': comercializador_tarifario,
             **valores_energia_exibir_tf,
-            'Preço Potência (€/dia)': round(preco_potencia_total_final_sem_iva_tf, 4),
-            'Custo Total Estimado (€)': round(custo_total_estimado_final_tf, 2),
+            'Potência (€/dia)': round(preco_potencia_total_final_sem_iva_tf, 4),
+            'Custo Total (€)': round(custo_total_estimado_final_tf, 2),
             # CAMPOS DO TOOLTIP DA POTÊNCIA FIXOS
             **componentes_tooltip_potencia_dict_tf,
             # CAMPOS DO TOOLTIP DA ENERGIA FIXOS
@@ -1673,7 +1720,8 @@ if comparar_indexados:
             tipo_tarifario = tarifario_indexado['tipo']
             comercializador_tarifario = tarifario_indexado['comercializador']
             link_adesao_idx = tarifario_indexado.get('site_adesao')
-            segmento_tarifario = tarifario_indexado.get('segmento', '-') # Default para novas colunas
+            notas_tarifario_idx = tarifario_indexado.get('notas', '') 
+            segmento_tarifario = tarifario_indexado.get('segmento', '-')
             faturacao_tarifario = tarifario_indexado.get('faturacao', '-')
             pagamento_tarifario = tarifario_indexado.get('pagamento', '-')
             formula_energia = str(tarifario_indexado.get('formula_calculo', '')) # Garantir string
@@ -2167,7 +2215,7 @@ if comparar_indexados:
                  elif p == 'C': periodo_nome = "Cheias"
                  elif p == 'P': periodo_nome = "Ponta"
                  if periodo_nome:
-                     valores_energia_exibir_idx[f'Preço Energia {periodo_nome} (€/kWh)'] = round(v, 4)
+                     valores_energia_exibir_idx[f'Energia {periodo_nome} (€/kWh)'] = round(v, 4)
 
             preco_potencia_total_final_sem_iva_idx = preco_comercializador_potencia_final_sem_iva_idx + tar_potencia_final_dia_sem_iva_idx
 
@@ -2175,14 +2223,15 @@ if comparar_indexados:
                 resultado_indexado = {
                     'NomeParaExibir': nome_tarifario,
                     'LinkAdesao': link_adesao_idx,
+                    'info_notas': notas_tarifario_idx,
                     'Tipo': tipo_tarifario,
                     'Segmento': segmento_tarifario,
                     'Faturação': faturacao_tarifario,
                     'Pagamento': pagamento_tarifario,
                     'Comercializador': comercializador_tarifario,
                     **valores_energia_exibir_idx,
-                    'Preço Potência (€/dia)': round(preco_potencia_total_final_sem_iva_idx, 4), # Preço final s/IVA
-                    'Custo Total Estimado (€)': round(custo_total_estimado_idx, 2),
+                    'Potência (€/dia)': round(preco_potencia_total_final_sem_iva_idx, 4), # Preço final s/IVA
+                    'Custo Total (€)': round(custo_total_estimado_idx, 2),
                     # CAMPOS DO TOOLTIP DA POTÊNCIA INDEXADOS
                     **componentes_tooltip_potencia_dict_idx,
                     # CAMPOS DO TOOLTIP DA ENERGIA INDEXADOS
@@ -2199,11 +2248,89 @@ if comparar_indexados:
 
 # --- Fim do if comparar_indexados ---
 
+
 # --- Processamento final e exibição da tabela de resultados ---
 st.markdown("---")
-vista_simplificada = st.checkbox("📱 Ativar vista simplificada (para ecrãs menores)", key="chk_vista_simplificada")
-st.subheader("💰 Tarifários de Eletricidade")
-st.write("Valores unitários sem IVA e Custo Total Estimado com todos os componentes, taxas e impostos")
+st.subheader("💰 Tiago Felícia - Tarifários de Eletricidade")
+
+# --- Construir Resumo dos Inputs para Exibição ---
+resumo_html_parts = ["<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 25px;'>"]
+resumo_html_parts.append("<h5 style='margin-top:0; color: #333;'>Resumo da Simulação:</h5>")
+resumo_html_parts.append("<ul style='list-style-type: none; padding-left: 0;'>")
+
+# 1. Potência contratada + Opção Horária e Ciclo
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>{potencia} kVA</b> em <b>{opcao_horaria}</b></li>")
+
+# 2. Consumo dividido por opção
+consumo_detalhe_str = ""
+if opcao_horaria.lower() == "simples":
+    consumo_detalhe_str = f"Simples: {consumo_simples:.0f} kWh"
+elif opcao_horaria.lower().startswith("bi"):
+    consumo_detalhe_str = f"Vazio: {consumo_vazio:.0f} kWh, Fora Vazio: {consumo_fora_vazio:.0f} kWh"
+elif opcao_horaria.lower().startswith("tri"):
+    consumo_detalhe_str = f"Vazio: {consumo_vazio:.0f} kWh, Cheias: {consumo_cheias:.0f} kWh, Ponta: {consumo_ponta:.0f} kWh"
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Consumos ({consumo:.0f} kWh Total):</b> {consumo_detalhe_str}</li>")
+
+# 3. Datas e Dias Faturados
+# 'dias_default_calculado' e 'dias' já foram calculados
+# 'dias_manual_input_val' é o valor do widget st.number_input para dias manuais
+dias_manual_valor_do_input = st.session_state.get('dias_manual_input_key', dias_default_calculado) # Use a key correta do seu input
+usou_dias_manuais_efetivamente = False
+if pd.notna(dias_manual_valor_do_input) and dias_manual_valor_do_input > 0 and \
+   int(dias_manual_valor_do_input) != dias_default_calculado:
+    usou_dias_manuais_efetivamente = True
+
+if usou_dias_manuais_efetivamente:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Período:</b> {dias} dias (definido manualmente)</li>")
+else:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Período:</b> De {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')} ({dias} dias)</li>")
+
+# 4. Valores OMIE da opção escolhida, com a referência
+# A variável 'nota_omie' já deve ter sido calculada (" (Média Final)" ou " (Média com Futuros)")
+omie_valores_str_parts = []
+if opcao_horaria.lower() == "simples":
+    val_s = st.session_state.get('omie_s_input_field', round(omie_medios_calculados.get('S',0), 2))
+    omie_valores_str_parts.append(f"Simples: {val_s:.2f} €/MWh")
+elif opcao_horaria.lower().startswith("bi"):
+    val_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2))
+    val_f = st.session_state.get('omie_f_input_field', round(omie_medios_calculados.get('F',0), 2))
+    omie_valores_str_parts.append(f"Vazio: {val_v:.2f} €/MWh")
+    omie_valores_str_parts.append(f"Fora Vazio: {val_f:.2f} €/MWh")
+elif opcao_horaria.lower().startswith("tri"):
+    val_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2))
+    val_c = st.session_state.get('omie_c_input_field', round(omie_medios_calculados.get('C',0), 2))
+    val_p = st.session_state.get('omie_p_input_field', round(omie_medios_calculados.get('P',0), 2))
+    omie_valores_str_parts.append(f"Vazio: {val_v:.2f} €/MWh")
+    omie_valores_str_parts.append(f"Cheias: {val_c:.2f} €/MWh")
+    omie_valores_str_parts.append(f"Ponta: {val_p:.2f} €/MWh")
+
+if omie_valores_str_parts: # Só mostra a secção OMIE se houver valores a exibir
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>OMIE {nota_omie}:</b> {', '.join(omie_valores_str_parts)}</li>")
+
+# 5. Perfil de consumo utilizado
+perfil_consumo_calculado_str = obter_perfil(consumo, dias, potencia) # Chamar a sua função
+# Formatar para uma apresentação mais amigável
+texto_perfil_apresentacao = perfil_consumo_calculado_str.replace("perfil_", "Perfil ").upper() # Ex: "Perfil A"
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Perfil de Consumo:</b> {texto_perfil_apresentacao}</li>")
+
+# 6. Tarifa Social (se ativa)
+if tarifa_social:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px; color: red;'><b>Benefício Aplicado:</b> Tarifa Social</li>")
+
+# 7. Família Numerosa (se ativa)
+if familia_numerosa:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px; color: red;'><b>Benefício Aplicado:</b> Família Numerosa</li>")
+
+resumo_html_parts.append("</ul>")
+resumo_html_parts.append("</div>")
+html_resumo_final = "".join(resumo_html_parts)
+
+# Exibir o resumo
+st.markdown(html_resumo_final, unsafe_allow_html=True)
+
+vista_simplificada = st.checkbox("📱 Ativar vista simplificada (ideal em ecrãs menores)", key="chk_vista_simplificada")
+
+st.write("Valores unitários sem IVA e Custo Total com todos os componentes, taxas e impostos")
 
 # Verifica se "O Meu Tarifário" deve ser incluído
 final_results_list = resultados_list.copy() # Começa com os tarifários fixos e/ou indexados
@@ -2218,9 +2345,9 @@ df_resultados = pd.DataFrame(final_results_list)
 if not df_resultados.empty:
     if vista_simplificada:
         # Definir a ordem específica para a vista simplificada
-        colunas_base_simplificada = ['NomeParaExibir', 'Custo Total Estimado (€)']
-        colunas_energia_existentes = [col for col in df_resultados.columns if 'Preço Energia' in col]
-        coluna_potencia = 'Preço Potência (€/dia)'
+        colunas_base_simplificada = ['NomeParaExibir', 'Custo Total (€)']
+        colunas_energia_existentes = [col for col in df_resultados.columns if 'Energia' in col]
+        coluna_potencia = 'Potência (€/dia)'
         col_order_visivel_aggrid = colunas_base_simplificada + colunas_energia_existentes # colunas_base_simplificada precisa ser definida antes
         if coluna_potencia in df_resultados.columns:
             col_order_visivel_aggrid.append(coluna_potencia)
@@ -2229,9 +2356,9 @@ if not df_resultados.empty:
 
     else:
         # Mapear colunas de exibição desejadas
-        col_order_visivel_aggrid = ['NomeParaExibir', 'LinkAdesao', 'Custo Total Estimado (€)']
-        col_order_visivel_aggrid.extend([col for col in df_resultados.columns if 'Preço Energia' in col])
-        col_order_visivel_aggrid.extend(['Preço Potência (€/dia)'])
+        col_order_visivel_aggrid = ['NomeParaExibir', 'LinkAdesao', 'Custo Total (€)']
+        col_order_visivel_aggrid.extend([col for col in df_resultados.columns if 'Energia' in col])
+        col_order_visivel_aggrid.extend(['Potência (€/dia)'])
         col_order_visivel_aggrid.extend(['Tipo', 'Comercializador', 'Segmento', 'Faturação', 'Pagamento'])
         colunas_visiveis_presentes = [col for col in col_order_visivel_aggrid if col in df_resultados.columns]
 
@@ -2272,7 +2399,7 @@ if not df_resultados.empty:
     ]
 
     # Colunas que DEVEM estar presentes nos dados do AgGrid para lógica JS, mesmo que ocultas visualmente
-    colunas_essenciais_para_js = ['Tipo', 'NomeParaExibir', 'LinkAdesao'] # Adicione outras se necessário
+    colunas_essenciais_para_js = ['Tipo', 'NomeParaExibir', 'LinkAdesao', 'info_notas'] # Adicione outras se necessário
     colunas_essenciais_para_js.extend(colunas_dados_tooltip) # as de tooltip já estão aqui
 
     # Unir colunas visíveis e essenciais para JS, removendo duplicados e mantendo a ordem das visíveis primeiro
@@ -2292,8 +2419,8 @@ if not df_resultados.empty:
     else:
         df_resultados_para_aggrid = df_resultados[colunas_para_aggrid_final].copy()
 
-        if 'Custo Total Estimado (€)' in df_resultados_para_aggrid.columns:
-            df_resultados_para_aggrid = df_resultados_para_aggrid.sort_values(by='Custo Total Estimado (€)')
+        if 'Custo Total (€)' in df_resultados_para_aggrid.columns:
+            df_resultados_para_aggrid = df_resultados_para_aggrid.sort_values(by='Custo Total (€)')
         df_resultados_para_aggrid = df_resultados_para_aggrid.reset_index(drop=True)
 
         # ---- INÍCIO DA CONFIGURAÇÃO DO AGGRID ----
@@ -2360,10 +2487,74 @@ if not df_resultados.empty:
             return {{}}; // Default também um objeto vazio
         }}
         """)
-        
-        # --- Configuração Coluna Nome Tarifário com Link e Tooltip ---
+
+        tooltip_nome_tarifario_getter_js = JsCode("""
+function(params) {
+    if (!params.data) { 
+        return params.value || ''; 
+    }
+
+    const nomeExibir = params.data.NomeParaExibir || '';
+    const notas = params.data.info_notas || ''; 
+
+    let tooltipHtmlParts = [];
+
+    if (nomeExibir) {
+        tooltipHtmlParts.push("<strong>" + nomeExibir + "</strong>");
+    }
+
+    if (notas) {
+        const notasHtml = notas.replace(/\\n/g, ' ').replace(/\n/g, ' ');
+        // Usando aspas simples para atributos de estilo HTML para simplificar
+        tooltipHtmlParts.push("<small style='display: block; margin-top: 5px;'><i>" + notasHtml + "</i></small>");
+    }
+    
+    if (tooltipHtmlParts.length > 0) {
+        // Se ambos nomeExibir e notas existem, queremos uma quebra de linha entre eles no tooltip.
+        // Se join(''), eles ficam lado a lado. Se join('<br>'), ficam em linhas separadas.
+        // Dado que a nota tem display:block, o join('') deve funcionar para colocá-los em "blocos" separados.
+        return tooltipHtmlParts.join(''); // Para agora, vamos juntar diretamente.
+                                         // Se quiser uma quebra de linha explícita entre o nome e as notas,
+                                         // e ambos existirem, pode usar:
+                                         // return tooltipHtmlParts.join('<br style="margin-bottom:5px">');
+    }
+    
+    return ''; 
+}
+        """)
+        # Defina este JsCode
+        custom_tooltip_component_js = JsCode("""
+            class CustomTooltip {
+                init(params) {
+                    // params.value é a string que o seu tooltipValueGetter retorna
+                    this.eGui = document.createElement('div');
+                    // Para permitir HTML, definimos o innerHTML
+                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
+                    // mas no seu caso, está a construí-lo programaticamente.
+                    this.eGui.innerHTML = params.value; 
+
+                    // Aplicar algum estilo básico para o tooltip se desejar
+                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
+                    this.eGui.style.color = 'black';           // Cor do texto
+                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
+                    this.eGui.style.padding = '8px';           // Mais padding
+                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
+                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
+                    this.eGui.style.maxWidth = '400px';        // Largura máxima
+                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
+                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
+                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
+                }
+
+                getGui() {
+                    return this.eGui;
+                }
+            }
+        """)
+
+        # --- Configuração Coluna Tarifário com Link e Tooltip ---
         # ... (link_tooltip_renderer_js) ...
-        gb.configure_column(field='NomeParaExibir', headerName='Nome Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=100, flex=2, filter='agTextColumnFilter',
+        gb.configure_column(field='NomeParaExibir', headerName='Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=100, flex=2, filter='agTextColumnFilter', tooltipValueGetter=tooltip_nome_tarifario_getter_js, tooltipComponent=custom_tooltip_component_js,
     cellStyle=cell_style_nome_tarifario_js)
         if 'LinkAdesao' in df_resultados_para_aggrid.columns: # Já verificado acima, mas boa prática
             gb.configure_column(field='LinkAdesao', hide=True) # Desativar filtro explicitamente
@@ -2371,7 +2562,7 @@ if not df_resultados.empty:
         # --- 2. Formatação Condicional de Cores ---
         cols_para_cor = [
             col for col in df_resultados_para_aggrid.columns
-            if 'Preço Energia' in col or 'Preço Potência' in col or 'Custo Total Estimado' in col
+            if 'Energia' in col or 'Potência' in col or 'Custo Total' in col
         ]
         min_max_data_for_js = {}
 
@@ -2538,7 +2729,7 @@ if not df_resultados.empty:
         """)
 
         # Configuração Coluna 'Preço Energia Simples (€/kWh)'
-        col_energia_s_nome = 'Preço Energia Simples (€/kWh)'
+        col_energia_s_nome = 'Energia Simples (€/kWh)'
         if col_energia_s_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2559,35 +2750,6 @@ if not df_resultados.empty:
                 }}
             """)
 
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '400px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
 
             gb.configure_column(
                 field=col_energia_s_nome,
@@ -2602,7 +2764,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Vazio (€/kWh)'
-        col_energia_v_nome = 'Preço Energia Vazio (€/kWh)'
+        col_energia_v_nome = 'Energia Vazio (€/kWh)'
         if col_energia_v_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2666,7 +2828,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Fora Vazio (€/kWh)'
-        col_energia_f_nome = 'Preço Energia Fora Vazio (€/kWh)'
+        col_energia_f_nome = 'Energia Fora Vazio (€/kWh)'
         if col_energia_f_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2730,7 +2892,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Cheias (€/kWh)'
-        col_energia_c_nome = 'Preço Energia Cheias (€/kWh)'
+        col_energia_c_nome = 'Energia Cheias (€/kWh)'
         if col_energia_c_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2794,7 +2956,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Ponta (€/kWh)'
-        col_energia_p_nome = 'Preço Energia Ponta (€/kWh)'
+        col_energia_p_nome = 'Energia Ponta (€/kWh)'
         if col_energia_p_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2868,7 +3030,7 @@ if not df_resultados.empty:
         #Tooltip Preço Potencia
         tooltip_preco_potencia_js = JsCode("""
         function(params) {
-            // params.value é o valor exibido na célula (Preço Potência (€/dia) final sem IVA)
+            // params.value é o valor exibido na célula (Potência (€/dia) final sem IVA)
             // params.data contém todos os dados da linha
             if (!params.data) {
                 // Se não houver dados da linha, retorna apenas o valor da célula como tooltip
@@ -2921,7 +3083,7 @@ if not df_resultados.empty:
 
         # Exemplo para a coluna 'Preço Potência (€/dia)'
         # (Assumindo que o nome da coluna no DataFrame é exatamente este)
-        col_potencia_nome = 'Preço Potência (€/dia)'
+        col_potencia_nome = 'Potência (€/dia)'
         if col_potencia_nome in df_resultados_para_aggrid.columns and col_potencia_nome in cols_para_cor:
             casas_decimais_pot = 4 # Preço potência geralmente tem mais casas decimais
     
@@ -2941,6 +3103,8 @@ if not df_resultados.empty:
                     }}
                 }}
             """)
+
+
 
             # Defina este JsCode
             custom_tooltip_component_js = JsCode("""
@@ -3063,8 +3227,8 @@ if not df_resultados.empty:
         }
         """)
 
-        # Configuração Coluna 'Custo Total Estimado (€)'
-        col_custo_total_nome = 'Custo Total Estimado (€)'
+        # Configuração Coluna 'Custo Total (€)'
+        col_custo_total_nome = 'Custo Total (€)'
         if col_custo_total_nome in df_resultados_para_aggrid.columns:
             casas_decimais_total = 2
     
@@ -3137,6 +3301,8 @@ if not df_resultados.empty:
             'suppressMiniFilter': False, # Garante que a caixa de pesquisa dentro do Set Filter aparece
         }
 
+        is_visible = col_name in colunas_visiveis_presentes
+
         text_columns_with_set_filter = ['Tipo', 'Segmento', 'Faturação', 'Pagamento']
         for col_name in text_columns_with_set_filter:
             if col_name in df_resultados_para_aggrid.columns:
@@ -3149,8 +3315,11 @@ if not df_resultados.empty:
                     flex=fx,
                     filter='agSetColumnFilter',
                     filterParams=set_filter_params,
-                    cellStyle={'textAlign': 'center'}
+                    cellStyle={'textAlign': 'center'},
+                    hide=(not is_visible) # <--- ADICIONA ESTA LINHA
+
                 )
+        is_visible_comerc = 'Comercializador' in colunas_visiveis_presentes
 
         # --- Configuração Coluna Comercializador (Text Filter) ---
         if 'Comercializador' in df_resultados_para_aggrid.columns:
@@ -3160,7 +3329,8 @@ if not df_resultados.empty:
                 minWidth=50,
                 flex=1,
                 filter='agTextColumnFilter',
-                cellStyle={'textAlign': 'center'}
+                cellStyle={'textAlign': 'center'},
+                hide=(not is_visible_comerc) # <--- ADICIONA ESTA LINHA
             )
 
 
@@ -3234,6 +3404,7 @@ if not df_resultados.empty:
 
         # Ocultar colunas de dados de tooltip
         colunas_de_dados_tooltip_a_ocultar = [
+            'info_notas', 
             'tooltip_pot_comerc_sem_tar', 'tooltip_pot_tar_bruta', 'tooltip_pot_ts_aplicada', 'tooltip_pot_desconto_ts_valor',
             # Energia Simples (S)
             'tooltip_energia_S_comerc_sem_tar', 'tooltip_energia_S_tar_bruta', 
@@ -3276,20 +3447,36 @@ if not df_resultados.empty:
             getRowStyle=get_row_style_meu_tarifario_js
         )
 
-
-
-        # Construir as opções da grelha
+        gb.configure_default_column(headerClass='center-header')
         gridOptions = gb.build()
+        custom_css = {
+            ".ag-header-cell-label": {
+                "justify-content": "center !important",
+                "text-align": "center !important",
+                "font-size": "14px !important",      # <-- aumenta o header
+                "font-weight": "bold !important"
+            },
+            ".ag-center-header": {
+                "justify-content": "center !important",
+                "text-align": "center !important",
+                "font-size": "14px !important"       # <-- reforço para headers
+            },
+            ".ag-cell": {
+                "font-size": "14px !important"       # <-- aumenta valores das células
+            },
+            ".ag-center-cols-clip": {"justify-content": "center !important", "text-align": "center !important"}
+        }
 
         # Exibir a Grelha
         AgGrid(
             df_resultados_para_aggrid,
             gridOptions=gridOptions,
+            custom_css=custom_css,
             allow_unsafe_jscode=True,
             fit_columns_on_grid_load=True,
             theme='streamlit', # Ou 'alpine' para testar
             key='aggrid_filtros_v3',    # MUDE A KEY para uma nova ao testar!
-            enable_enterprise_modules=True  # ADICIONE ESTA LINHA
+            enable_enterprise_modules=True,  # ADICIONE ESTA LINHA
         )
         # ---- FIM DA CONFIGURAÇÃO DO AGGRID ----
 
@@ -3306,20 +3493,20 @@ if not df_resultados.empty:
     st.markdown("---") # Uma linha divisória opcional
     st.subheader("📖 Legenda das Colunas da Tabela Tarifários de Eletricidade")
     st.caption("""
-    * **Nome Tarifário**: Nome identificativo do tarifário. Pode incluir notas sobre descontos de fatura específicos.
+    * **Tarifário**: Nome identificativo do tarifário. Pode incluir notas sobre descontos de fatura específicos.
     * **Tipo**: Indica se o tarifário é:
         * `Fixo`: Preços de energia e potência são constantes.
         * `Indexado (Média)`: Preço da energia baseado na média do OMIE para os períodos horários.
         * `Indexado (Quarto-Horário)`: Preço da energia baseado nos valores OMIE horários/quarto-horários e, para alguns, no perfil de consumo.
         * `Pessoal`: O seu tarifário, conforme introduzido.
     * **Comercializador**: Empresa que oferece o tarifário.
-    * **Preço Energia [...] (€/kWh)**: Custo unitário da energia para o período indicado (Simples, Vazio, Fora Vazio, Cheias, Ponta), **sem IVA**.
+    * **Energia [...] (€/kWh)**: Custo unitário da energia para o período indicado (Simples, Vazio, Fora Vazio, Cheias, Ponta), **sem IVA**.
         * Para "O Meu Tarifário", este valor já reflete quaisquer descontos percentuais de energia e o desconto da Tarifa Social que tenhas configurado.
         * Para os outros tarifários, é o preço base sem IVA, já considerando o desconto da Tarifa Social se ativa.
-    * **Preço Potência (€/dia)**: Custo unitário diário da potência contratada, **sem IVA**.
+    * **Potência (€/dia)**: Custo unitário diário da potência contratada e Termo Fixo **sem IVA**.
         * Para "O Meu Tarifário", este valor já reflete quaisquer descontos percentuais de potência e o desconto da Tarifa Social que tenhas configurado.
         * Para os outros tarifários, é o preço base sem IVA, já considerando o desconto da Tarifa Social se ativa.
-    * **Custo Total Estimado (€)**: Valor final estimado da fatura para o período simulado. Este custo inclui:
+    * **Custo Total (€)**: Valor final estimado da fatura para o período simulado. Este custo inclui:
         * Custo da energia consumida (com IVA aplicado conforme as regras).
         * Custo da potência contratada (com IVA aplicado conforme as regras).
         * Taxas adicionais: IEC (Imposto Especial de Consumo, isento com Tarifa Social), DGEG (Taxa de Exploração da Direção-Geral de Energia e Geologia) e CAV (Contribuição Audiovisual).
