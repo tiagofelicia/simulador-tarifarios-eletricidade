@@ -10,20 +10,6 @@ from st_aggrid.shared import GridUpdateMode, JsCode # JsCode só é necessário 
 
 st.set_page_config(page_title="Simulador de Tarifários de Eletricidade", layout="wide")
 
-#TENTAR IMPEDIR MENU DE EXPORTAR DADOS EM DISPOSITIVOS MOVEIS
-st.markdown("""
-    <style>
-    @media (max-width: 900px) {
-      .ag-cell {
-        user-select: none !important;
-        -webkit-user-select: none !important;
-        -ms-user-select: none !important;
-        -webkit-touch-callout: none !important;
-      }
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # --- Carregar ficheiro Excel do GitHub ---
 @st.cache_data(ttl=3600, show_spinner=False) # Cacheia por 1 hora (3600 segundos)
 def carregar_dados_excel(url):
@@ -38,12 +24,8 @@ def carregar_dados_excel(url):
     if 'DataHora' in omie_perdas_ciclos.columns:
         omie_perdas_ciclos['DataHora'] = pd.to_datetime(omie_perdas_ciclos['DataHora'])
     else:
-        # Fallback se não houver coluna de data, para evitar erro mais à frente
-        # Idealmente, deveria haver um tratamento de erro mais robusto ou validação dos dados
         st.error("Coluna 'DataHora' ou 'Data' não encontrada na aba OMIE_PERDAS_CICLOS.")
-        # Adiciona uma coluna DataHora vazia para evitar erros de KeyError, mas os cálculos OMIE falharão
         omie_perdas_ciclos['DataHora'] = pd.Series(dtype='datetime64[ns]')
-
 
     constantes = xls.parse("Constantes")
     return tarifarios_fixos, tarifarios_indexados, omie_perdas_ciclos, constantes
@@ -2474,17 +2456,21 @@ if not df_resultados.empty:
         }
         """) # <--- FIM DA DEFINIÇÃO DE link_tooltip_renderer_js
         
-        # DEFINA AQUI AS SUAS CORES PARA TARIFÁRIOS INDEXADOS:
-        # Exemplo: fundo azul claro com texto preto
-        cor_fundo_indexado_css = "#ADD8E6"  # String Python para o valor CSS
-        cor_texto_indexado_css = "black"   # String Python para o valor CSS
-
-        # Ou, por exemplo, amarelo pálido com texto preto:
-        # cor_fundo_indexado = "'#FFFFE0'"  # LightYellow
-        # cor_texto_indexado = "'black'"
+        #CORES PARA TARIFÁRIOS INDEXADOS:
+        cor_fundo_indexado_media_css = "#FFE699"
+        cor_texto_indexado_media_css = "black"
+        cor_fundo_indexado_dinamico_css = "#F8CBAD"  
+        cor_texto_indexado_dinamico_css = "black"
 
         cell_style_nome_tarifario_js = JsCode(f"""
         function(params) {{
+            // Estilo base com cantos arredondados e padding
+            let baseStyle = {{ 
+            textAlign: 'center',
+            borderRadius: '5px', 
+            padding: '10px 10px'
+        }};                                  
+
             if (params.data) {{
                 const nomeExibir = params.data.NomeParaExibir;
                 const tipoTarifario = params.data.Tipo;
@@ -2492,8 +2478,11 @@ if not df_resultados.empty:
 
                 if (nomeExibir === 'O Meu Tarifário') {{
                     return {{ backgroundColor: 'red', color: 'white', fontWeight: 'bold', textAlign: 'center' }};
-                }} else if (tipoTarifario === 'Indexado Média' || tipoTarifario === 'Indexado quarto-horário') {{
-                    return {{ backgroundColor: '{cor_fundo_indexado_css}', color: '{cor_texto_indexado_css}', textAlign: 'center' }};
+                }} else if (tipoTarifario === 'Indexado Média') {{
+                    return {{ backgroundColor: '{cor_fundo_indexado_media_css}', color: '{cor_texto_indexado_media_css}', textAlign: 'center' }};
+                }} else if (tipoTarifario === 'Indexado quarto-horário') {{
+                    return {{ backgroundColor: '{cor_fundo_indexado_dinamico_css}', color: '{cor_texto_indexado_dinamico_css}', textAlign: 'center' }};
+
                 }} else {{
                     // Para tarifários fixos ou outros não especificados
                     return {{textAlign: 'center'}}; // Retorna um objeto de estilo vazio em vez de null
@@ -2503,41 +2492,43 @@ if not df_resultados.empty:
         }}
         """)
 
+        #tooltip Nome Tarifario
         tooltip_nome_tarifario_getter_js = JsCode("""
-function(params) {
-    if (!params.data) { 
-        return params.value || ''; 
-    }
+        function(params) {
+            if (!params.data) { 
+                return params.value || ''; 
+            }
 
-    const nomeExibir = params.data.NomeParaExibir || '';
-    const notas = params.data.info_notas || ''; 
+            const nomeExibir = params.data.NomeParaExibir || '';
+            const notas = params.data.info_notas || ''; 
 
-    let tooltipHtmlParts = [];
+            let tooltipHtmlParts = [];
 
-    if (nomeExibir) {
-        tooltipHtmlParts.push("<strong>" + nomeExibir + "</strong>");
-    }
+            if (nomeExibir) {
+                tooltipHtmlParts.push("<strong>" + nomeExibir + "</strong>");
+            }
 
-    if (notas) {
-        const notasHtml = notas.replace(/\\n/g, ' ').replace(/\n/g, ' ');
-        // Usando aspas simples para atributos de estilo HTML para simplificar
-        tooltipHtmlParts.push("<small style='display: block; margin-top: 5px;'><i>" + notasHtml + "</i></small>");
-    }
+            if (notas) {
+                const notasHtml = notas.replace(/\\n/g, ' ').replace(/\n/g, ' ');
+                // Usando aspas simples para atributos de estilo HTML para simplificar
+                tooltipHtmlParts.push("<small style='display: block; margin-top: 5px;'><i>" + notasHtml + "</i></small>");
+            }
     
-    if (tooltipHtmlParts.length > 0) {
-        // Se ambos nomeExibir e notas existem, queremos uma quebra de linha entre eles no tooltip.
-        // Se join(''), eles ficam lado a lado. Se join('<br>'), ficam em linhas separadas.
-        // Dado que a nota tem display:block, o join('') deve funcionar para colocá-los em "blocos" separados.
-        return tooltipHtmlParts.join(''); // Para agora, vamos juntar diretamente.
-                                         // Se quiser uma quebra de linha explícita entre o nome e as notas,
-                                         // e ambos existirem, pode usar:
-                                         // return tooltipHtmlParts.join('<br style="margin-bottom:5px">');
-    }
+            if (tooltipHtmlParts.length > 0) {
+                // Se ambos nomeExibir e notas existem, queremos uma quebra de linha entre eles no tooltip.
+                // Se join(''), eles ficam lado a lado. Se join('<br>'), ficam em linhas separadas.
+                // Dado que a nota tem display:block, o join('') deve funcionar para colocá-los em "blocos" separados.
+                return tooltipHtmlParts.join(''); // Para agora, vamos juntar diretamente.
+                                                 // Se quiser uma quebra de linha explícita entre o nome e as notas,
+                                                 // e ambos existirem, pode usar:
+                                                 // return tooltipHtmlParts.join('<br style="margin-bottom:5px">');
+            }
     
-    return ''; 
-}
-        """)
-        # Defina este JsCode
+            return ''; 
+        }
+                """)
+        
+        # Custom_Tooltip
         custom_tooltip_component_js = JsCode("""
             class CustomTooltip {
                 init(params) {
@@ -2552,8 +2543,8 @@ function(params) {
                     this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
                     this.eGui.style.color = 'black';           // Cor do texto
                     this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
+                    this.eGui.style.padding = '10px';           // Mais padding
+                    this.eGui.style.borderRadius = '5px';      // Cantos arredondados
                     this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
                     this.eGui.style.maxWidth = '400px';        // Largura máxima
                     this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
@@ -2568,10 +2559,9 @@ function(params) {
         """)
 
         # --- Configuração Coluna Tarifário com Link e Tooltip ---
-        # ... (link_tooltip_renderer_js) ...
         gb.configure_column(field='NomeParaExibir', headerName='Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=100, flex=2, filter='agTextColumnFilter', tooltipValueGetter=tooltip_nome_tarifario_getter_js, tooltipComponent=custom_tooltip_component_js,
     cellStyle=cell_style_nome_tarifario_js)
-        if 'LinkAdesao' in df_resultados_para_aggrid.columns: # Já verificado acima, mas boa prática
+        if 'LinkAdesao' in df_resultados_para_aggrid.columns:
             gb.configure_column(field='LinkAdesao', hide=True) # Desativar filtro explicitamente
                     
         # --- 2. Formatação Condicional de Cores ---
@@ -2591,13 +2581,18 @@ function(params) {
 
         min_max_data_json_string = json.dumps(min_max_data_for_js)
 
-    # Adaptar a tua função get_color para JavaScript
+    # Função get_color para JavaScript (para cor nas colunas de valor)
         cell_style_cores_js = JsCode(f"""
         function(params) {{
             const colName = params.colDef.field;
             const value = parseFloat(params.value);
             const minMaxConfig = {min_max_data_json_string}; //
-            let style = {{ textAlign: 'center' }};
+
+            let style = {{ 
+                textAlign: 'center',
+                borderRadius: '5px',
+                padding: '10px 10px'
+            }};
 
             if (isNaN(value) || !minMaxConfig[colName]) {{
                 return style; // Sem cor para NaN ou se não houver config min/max
@@ -2736,7 +2731,7 @@ function(params) {
                 tooltipParts.push("Desconto Tarifa Social: -" + formatPrice(tsDescontoValorEnergia, 4) + " €/kWh");
             }
     
-            tooltipParts.push("--------------------------------------------------------");
+            tooltipParts.push("----------------------------------------------------");
             tooltipParts.push("<b>Custo Final : " + formatPrice(parseFloat(params.value), 4) + " €/kWh</b>");
     
             return tooltipParts.join("<br>");
@@ -2746,7 +2741,7 @@ function(params) {
         # Configuração Coluna 'Preço Energia Simples (€/kWh)'
         col_energia_s_nome = 'Energia Simples (€/kWh)'
         if col_energia_s_nome in df_resultados_para_aggrid.columns:
-            casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
+            casas_decimais_energia = 4
     
             js_value_formatter_energia = JsCode(f"""
                 function(params) {{
@@ -2765,15 +2760,14 @@ function(params) {
                 }}
             """)
 
-
             gb.configure_column(
                 field=col_energia_s_nome,
                 headerName=col_energia_s_nome,
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter=js_value_formatter_energia, # Seu valueFormatter existente
+                valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
-                tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
-                tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
+                tooltipValueGetter=tooltip_preco_energia_js,
+                tooltipComponent=custom_tooltip_component_js,
                 minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
@@ -2781,7 +2775,7 @@ function(params) {
         # Configuração Coluna 'Preço Energia Vazio (€/kWh)'
         col_energia_v_nome = 'Energia Vazio (€/kWh)'
         if col_energia_v_nome in df_resultados_para_aggrid.columns:
-            casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
+            casas_decimais_energia = 4
     
             js_value_formatter_energia = JsCode(f"""
                 function(params) {{
@@ -2800,44 +2794,14 @@ function(params) {
                 }}
             """)
 
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '400px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
-
             gb.configure_column(
                 field=col_energia_v_nome,
                 headerName=col_energia_v_nome,
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter=js_value_formatter_energia, # Seu valueFormatter existente
+                valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
-                tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
-                tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
+                tooltipValueGetter=tooltip_preco_energia_js,
+                tooltipComponent=custom_tooltip_component_js,
                 minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
@@ -2864,44 +2828,14 @@ function(params) {
                 }}
             """)
 
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '400px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
-
             gb.configure_column(
                 field=col_energia_f_nome,
                 headerName=col_energia_f_nome,
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter=js_value_formatter_energia, # Seu valueFormatter existente
+                valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
-                tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
-                tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
+                tooltipValueGetter=tooltip_preco_energia_js,
+                tooltipComponent=custom_tooltip_component_js,
                 minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
@@ -2928,44 +2862,14 @@ function(params) {
                 }}
             """)
 
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '400px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
-
             gb.configure_column(
                 field=col_energia_c_nome,
                 headerName=col_energia_c_nome,
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter=js_value_formatter_energia, # Seu valueFormatter existente
+                valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
-                tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
-                tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
+                tooltipValueGetter=tooltip_preco_energia_js,
+                tooltipComponent=custom_tooltip_component_js,
                 minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
@@ -2973,7 +2877,7 @@ function(params) {
         # Configuração Coluna 'Preço Energia Ponta (€/kWh)'
         col_energia_p_nome = 'Energia Ponta (€/kWh)'
         if col_energia_p_nome in df_resultados_para_aggrid.columns:
-            casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
+            casas_decimais_energia = 4
     
             js_value_formatter_energia = JsCode(f"""
                 function(params) {{
@@ -2992,55 +2896,17 @@ function(params) {
                 }}
             """)
 
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '400px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
-
             gb.configure_column(
                 field=col_energia_p_nome,
                 headerName=col_energia_p_nome,
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter=js_value_formatter_energia, # Seu valueFormatter existente
+                valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
-                tooltipValueGetter=tooltip_preco_energia_js, # <--- SEU NOVO TOOLTIP GETTER
-                tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
+                tooltipValueGetter=tooltip_preco_energia_js,
+                tooltipComponent=custom_tooltip_component_js,
                 minWidth=60, # Ajuste conforme necessário
                 flex=1
             )
-
-
-
-
-
-
-
-
 
         #Tooltip Preço Potencia
         tooltip_preco_potencia_js = JsCode("""
@@ -3086,7 +2952,7 @@ function(params) {
                 tooltipParts.push("Desconto Tarifa Social: -" + formatPrice(descontoTSValor) + " €/dia");
             }
     
-            tooltipParts.push("--------------------------------------------------------");
+            tooltipParts.push("----------------------------------------------------");
             tooltipParts.push("<b>Custo Final : " + formatPrice(parseFloat(params.value)) + " €/dia</b>");
 
             var finalTooltipHtml = tooltipParts.join("<br>");
@@ -3097,10 +2963,9 @@ function(params) {
         """)
 
         # Exemplo para a coluna 'Preço Potência (€/dia)'
-        # (Assumindo que o nome da coluna no DataFrame é exatamente este)
         col_potencia_nome = 'Potência (€/dia)'
         if col_potencia_nome in df_resultados_para_aggrid.columns and col_potencia_nome in cols_para_cor:
-            casas_decimais_pot = 4 # Preço potência geralmente tem mais casas decimais
+            casas_decimais_pot = 4
     
             js_value_formatter_potencia = JsCode(f"""
                 function(params) {{
@@ -3119,52 +2984,19 @@ function(params) {
                 }}
             """)
 
-
-
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '400px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
-
             #Configuração Coluna Potência
             gb.configure_column(
                 field=col_potencia_nome,
                 headerName=col_potencia_nome,
                 type=["numericColumn", "numberColumnFilter"],
                 valueFormatter=js_value_formatter_potencia,
-                cellStyle=cell_style_cores_js, # Sua função de estilo de cores
-                tooltipValueGetter=tooltip_preco_potencia_js, # <<<---- APLICAR O TOOLTIP GETTER AQUI
-                tooltipComponent=custom_tooltip_component_js, # <<<--- ADICIONAR ISTO
-                # tooltipComponentParams={'color': '#aabbcc'} # Pode passar params para o custom component
+                cellStyle=cell_style_cores_js,
+                tooltipValueGetter=tooltip_preco_potencia_js,
+                tooltipComponent=custom_tooltip_component_js,
+                # tooltipComponentParams={'color': '#aabbcc'}
             )
 
         #Tooltip Custo Total
-
         tooltip_custo_total_js = JsCode("""
         function(params) {
             if (!params.data) { return String(params.value); }
@@ -3264,50 +3096,17 @@ function(params) {
                 }}
             """)
 
-            # Defina este JsCode
-            custom_tooltip_component_js = JsCode("""
-            class CustomTooltip {
-                init(params) {
-                    // params.value é a string que o seu tooltipValueGetter retorna
-                    this.eGui = document.createElement('div');
-                    // Para permitir HTML, definimos o innerHTML
-                    // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
-                    // mas no seu caso, está a construí-lo programaticamente.
-                    this.eGui.innerHTML = params.value; 
-
-                    // Aplicar algum estilo básico para o tooltip se desejar
-                    this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
-                    this.eGui.style.color = 'black';           // Cor do texto
-                    this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
-                    this.eGui.style.padding = '8px';           // Mais padding
-                    this.eGui.style.borderRadius = '4px';      // Cantos arredondados
-                    this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
-                    this.eGui.style.maxWidth = '500px';        // Largura máxima
-                    this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
-                    this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
-                    this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
-                }
-
-                getGui() {
-                    return this.eGui;
-                }
-            }
-            """)
-
             gb.configure_column(
                 field=col_custo_total_nome,
                 headerName=col_custo_total_nome,
                 type=["numericColumn", "numberColumnFilter"],
-                valueFormatter=js_value_formatter_energia, # Seu valueFormatter existente
+                valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
-                tooltipValueGetter=tooltip_custo_total_js, # <--- SEU NOVO TOOLTIP GETTER
-                tooltipComponent=custom_tooltip_component_js,      # <--- SEU CUSTOM TOOLTIP COMPONENT
-                minWidth=50, # Ajuste conforme necessário
+                tooltipValueGetter=tooltip_custo_total_js, 
+                tooltipComponent=custom_tooltip_component_js, 
+                minWidth=80, # Ajuste conforme necessário
                 flex=1
             )
-
-
-
 
         # --- Configuração de Colunas com Set Filter ---
         set_filter_params = {
@@ -3324,14 +3123,19 @@ function(params) {
                 min_w = 100 if col_name == 'Tipo' else 120
                 fx = 0.5 if col_name == 'Tipo' else 0.75
                 gb.configure_column(
-                    col_name, # Nome da coluna no DataFrame
+                    col_name, 
                     headerName=col_name,
                     minWidth=min_w,
                     flex=fx,
                     filter='agSetColumnFilter',
                     filterParams=set_filter_params,
-                    cellStyle={'textAlign': 'center'},
-                    hide=(not is_visible) # <--- ADICIONA ESTA LINHA
+                    cellStyle={
+                        'textAlign': 'center', 
+                        'borderRadius': '5px',
+                        'padding': '10px 10px',
+                        'backgroundColor': '#f0f0f0' 
+                    },
+                    hide=(not is_visible) 
 
                 )
         is_visible_comerc = 'Comercializador' in colunas_visiveis_presentes
@@ -3344,11 +3148,14 @@ function(params) {
                 minWidth=50,
                 flex=1,
                 filter='agTextColumnFilter',
-                cellStyle={'textAlign': 'center'},
-                hide=(not is_visible_comerc) # <--- ADICIONA ESTA LINHA
+                cellStyle={
+                    'textAlign': 'center', 
+                    'borderRadius': '6px', 
+                    'padding': '10px 10px', 
+                    'backgroundColor': '#f0f0f0'
+                },
+                hide=(not is_visible_comerc)
             )
-
-
 
         # Configurar outras colunas (Tipo, Comercializador e colunas de dados)
         for col_nome_num in df_resultados_para_aggrid.columns:
@@ -3387,9 +3194,9 @@ function(params) {
                 gb.configure_column(
                     field=col_nome_num,
                     headerName=col_nome_num,
-                    type=["numericColumn", "numberColumnFilter"], # Isto já define o filtro numérico
-                    valueFormatter=js_value_formatter_para_coluna, # USAR O JsCode AQUI
-                    cellStyle=cell_style_cores_js, # O seu cell_style_cores_js deve estar correto
+                    type=["numericColumn", "numberColumnFilter"], 
+                    valueFormatter=js_value_formatter_para_coluna,
+                    cellStyle=cell_style_cores_js,
                     minWidth=50,
                     flex=1
                 )
@@ -3411,7 +3218,7 @@ function(params) {
             if 'LinkAdesao' not in colunas_visiveis_presentes and 'LinkAdesao' in df_resultados_para_aggrid.columns:
                 gb.configure_column(field='LinkAdesao', hide=True)
             # Oculte outras colunas que estão nos dados mas não são visíveis na vista simplificada
-            colunas_desktop_a_ocultar_na_vista_movel = ['Segmento', 'Faturação', 'Pagamento', 'Comercializador'] # Exemplo
+            colunas_desktop_a_ocultar_na_vista_movel = ['Segmento', 'Faturação', 'Pagamento', 'Comercializador']
             for col_ocultar in colunas_desktop_a_ocultar_na_vista_movel:
                 if col_ocultar not in colunas_visiveis_presentes and col_ocultar in df_resultados_para_aggrid.columns:
                      gb.configure_column(field=col_ocultar, hide=True)
@@ -3489,9 +3296,9 @@ function(params) {
             custom_css=custom_css,
             allow_unsafe_jscode=True,
             fit_columns_on_grid_load=True,
-            theme='streamlit', # Ou 'alpine' para testar
-            key='aggrid_filtros_v3',    # MUDE A KEY para uma nova ao testar!
-            enable_enterprise_modules=True,  # ADICIONE ESTA LINHA
+            theme='alpine', # Ou 'streamlit' para testar
+            key='aggrid',
+            enable_enterprise_modules=True,
         )
         # ---- FIM DA CONFIGURAÇÃO DO AGGRID ----
 
@@ -3512,7 +3319,7 @@ function(params) {
     * **Tipo**: Indica se o tarifário é:
         * `Fixo`: Preços de energia e potência são constantes.
         * `Indexado (Média)`: Preço da energia baseado na média do OMIE para os períodos horários.
-        * `Indexado (Quarto-Horário)`: Preço da energia baseado nos valores OMIE horários/quarto-horários e, para alguns, no perfil de consumo.
+        * `Indexado (Quarto-Horário)`: Preço da energia baseado nos valores OMIE horários/quarto-horários e no perfil de consumo.
         * `Pessoal`: O seu tarifário, conforme introduzido.
     * **Comercializador**: Empresa que oferece o tarifário.
     * **Energia [...] (€/kWh)**: Custo unitário da energia para o período indicado (Simples, Vazio, Fora Vazio, Cheias, Ponta), **sem IVA**.
