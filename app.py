@@ -1243,7 +1243,7 @@ if meu_tarifario_ativo:
                 elif p == 'P': periodo_nome = "Ponta"
                 if periodo_nome:
                     # Arredondar aqui para a exibição, se necessário (ex: 4 casas decimais)
-                    valores_energia_meu_exibir_dict[f'Energia {periodo_nome} (€/kWh)'] = round(v_energia, 4)
+                    valores_energia_meu_exibir_dict[f'{periodo_nome} (€/kWh)'] = round(v_energia, 4)
 
         resultado_meu_tarifario_dict = {
             'NomeParaExibir': nome_para_exibir_meu_tarifario,
@@ -1255,7 +1255,7 @@ if meu_tarifario_ativo:
             'Pagamento': "-",          
             **valores_energia_meu_exibir_dict,
             'Potência (€/dia)': round(preco_potencia_final_unitario_sem_iva, 4), # Arredondar para exibição
-            'Custo Total (€)': round(custo_total_meu_tarifario_com_iva, 2),
+            'Total (€)': round(custo_total_meu_tarifario_com_iva, 2),
             'opcao_horaria_calculada': opcao_horaria, # Importante para a lógica da resposta anterior
             # CAMPOS DO TOOLTIP DA POTÊNCIA MEU
             **componentes_tooltip_potencia_dict_meu,
@@ -1568,7 +1568,7 @@ if not tarifarios_filtrados_fixos.empty:
             elif p == 'C': periodo_nome = "Cheias"
             elif p == 'P': periodo_nome = "Ponta"
             if periodo_nome:
-                valores_energia_exibir_tf[f'Energia {periodo_nome} (€/kWh)'] = round(v_energia_sem_iva, 4)
+                valores_energia_exibir_tf[f'{periodo_nome} (€/kWh)'] = round(v_energia_sem_iva, 4)
 
         preco_potencia_total_final_sem_iva_tf = preco_comercializador_potencia_final_sem_iva_tf + tar_potencia_final_dia_sem_iva_tf
 
@@ -1686,7 +1686,7 @@ if not tarifarios_filtrados_fixos.empty:
             'Comercializador': comercializador_tarifario,
             **valores_energia_exibir_tf,
             'Potência (€/dia)': round(preco_potencia_total_final_sem_iva_tf, 4),
-            'Custo Total (€)': round(custo_total_estimado_final_tf, 2),
+            'Total (€)': round(custo_total_estimado_final_tf, 2),
             # CAMPOS DO TOOLTIP DA POTÊNCIA FIXOS
             **componentes_tooltip_potencia_dict_tf,
             # CAMPOS DO TOOLTIP DA ENERGIA FIXOS
@@ -1826,6 +1826,8 @@ if comparar_indexados:
                             elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
                             elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
                             elif nome_tarifario == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil = (omie * constantes.get('G9_FA', 1.0) * perdas + constantes.get('G9_CGS', 0.0) + constantes.get('G9_AC', 0.0))
+                            elif nome_tarifario == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil = (omie * perdas + constantes.get("Iberdrola_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0))
+
 
                             else: calculo_instantaneo_sem_perfil = omie * perdas # Fallback genérico
                             # --- Fim Fórmulas ---
@@ -2213,7 +2215,7 @@ if comparar_indexados:
                  elif p == 'C': periodo_nome = "Cheias"
                  elif p == 'P': periodo_nome = "Ponta"
                  if periodo_nome:
-                     valores_energia_exibir_idx[f'Energia {periodo_nome} (€/kWh)'] = round(v, 4)
+                     valores_energia_exibir_idx[f'{periodo_nome} (€/kWh)'] = round(v, 4)
 
             preco_potencia_total_final_sem_iva_idx = preco_comercializador_potencia_final_sem_iva_idx + tar_potencia_final_dia_sem_iva_idx
 
@@ -2229,7 +2231,7 @@ if comparar_indexados:
                     'Comercializador': comercializador_tarifario,
                     **valores_energia_exibir_idx,
                     'Potência (€/dia)': round(preco_potencia_total_final_sem_iva_idx, 4), # Preço final s/IVA
-                    'Custo Total (€)': round(custo_total_estimado_idx, 2),
+                    'Total (€)': round(custo_total_estimado_idx, 2),
                     # CAMPOS DO TOOLTIP DA POTÊNCIA INDEXADOS
                     **componentes_tooltip_potencia_dict_idx,
                     # CAMPOS DO TOOLTIP DA ENERGIA INDEXADOS
@@ -2334,7 +2336,7 @@ st.markdown(html_resumo_final, unsafe_allow_html=True)
 
 vista_simplificada = st.checkbox("📱 Ativar vista simplificada (ideal em ecrãs menores)", key="chk_vista_simplificada")
 
-st.write("Valores unitários sem IVA e Custo Total com todos os componentes, taxas e impostos")
+st.write("Total com todos os componentes, taxas e impostos e Valores unitários sem IVA")
 
 # Verifica se "O Meu Tarifário" deve ser incluído
 final_results_list = resultados_list.copy() # Começa com os tarifários fixos e/ou indexados
@@ -2352,15 +2354,15 @@ try:
         meu_tarifario_linha = df_resultados[df_resultados['NomeParaExibir'].str.contains("O Meu Tarifário", case=False, na=False)]
 
         if not meu_tarifario_linha.empty:
-            custo_meu_tarifario = meu_tarifario_linha['Custo Total (€)'].iloc[0]
+            custo_meu_tarifario = meu_tarifario_linha['Total (€)'].iloc[0]
             nome_meu_tarifario = meu_tarifario_linha['NomeParaExibir'].iloc[0]
 
             # Garantir que há valores válidos para calcular o mínimo
-            custos_validos = df_resultados['Custo Total (€)'].dropna()
+            custos_validos = df_resultados['Total (€)'].dropna()
             if not custos_validos.empty:
                 custo_minimo_geral = custos_validos.min()
                 # idxmin() em custos_validos para evitar erro se houver apenas NaNs no original
-                linha_mais_barata_geral = df_resultados.loc[df_resultados['Custo Total (€)'] == custo_minimo_geral].iloc[0] # Mais seguro que idxmin se houver NaNs
+                linha_mais_barata_geral = df_resultados.loc[df_resultados['Total (€)'] == custo_minimo_geral].iloc[0] # Mais seguro que idxmin se houver NaNs
                 nome_tarifario_mais_barato_geral = linha_mais_barata_geral['NomeParaExibir']
 
                 if custo_meu_tarifario > custo_minimo_geral:
@@ -2410,8 +2412,9 @@ time.sleep(0.1) # Geralmente uma má ideia em apps Streamlit
 if not df_resultados.empty:
     if vista_simplificada:
         # Definir a ordem específica para a vista simplificada
-        colunas_base_simplificada = ['NomeParaExibir', 'Custo Total (€)']
-        colunas_energia_existentes = [col for col in df_resultados.columns if 'Energia' in col]
+        colunas_base_simplificada = ['NomeParaExibir', 'Total (€)']
+        nomes_periodos_energia = ["Simples", "Vazio", "Fora Vazio", "Cheias", "Ponta"]
+        colunas_energia_existentes = [f'{p_nome} (€/kWh)' for p_nome in nomes_periodos_energia if f'{p_nome} (€/kWh)' in df_resultados.columns]
         coluna_potencia = 'Potência (€/dia)'
         col_order_visivel_aggrid = colunas_base_simplificada + colunas_energia_existentes # colunas_base_simplificada precisa ser definida antes
         if coluna_potencia in df_resultados.columns:
@@ -2421,8 +2424,10 @@ if not df_resultados.empty:
 
     else:
         # Mapear colunas de exibição desejadas
-        col_order_visivel_aggrid = ['NomeParaExibir', 'LinkAdesao', 'Custo Total (€)']
-        col_order_visivel_aggrid.extend([col for col in df_resultados.columns if 'Energia' in col])
+        nomes_periodos_energia = ["Simples", "Vazio", "Fora Vazio", "Cheias", "Ponta"]
+        colunas_energia_esperadas = [f'{p_nome} (€/kWh)' for p_nome in nomes_periodos_energia]
+        col_order_visivel_aggrid = ['NomeParaExibir', 'LinkAdesao', 'Total (€)']
+        col_order_visivel_aggrid.extend([col for col in colunas_energia_esperadas if col in df_resultados.columns])
         col_order_visivel_aggrid.extend(['Potência (€/dia)'])
         col_order_visivel_aggrid.extend(['Tipo', 'Comercializador', 'Segmento', 'Faturação', 'Pagamento'])
         colunas_visiveis_presentes = [col for col in col_order_visivel_aggrid if col in df_resultados.columns]
@@ -2485,8 +2490,8 @@ if not df_resultados.empty:
     else:
         df_resultados_para_aggrid = df_resultados[colunas_para_aggrid_final].copy()
 
-        if 'Custo Total (€)' in df_resultados_para_aggrid.columns:
-            df_resultados_para_aggrid = df_resultados_para_aggrid.sort_values(by='Custo Total (€)')
+        if 'Total (€)' in df_resultados_para_aggrid.columns:
+            df_resultados_para_aggrid = df_resultados_para_aggrid.sort_values(by='Total (€)')
         df_resultados_para_aggrid = df_resultados_para_aggrid.reset_index(drop=True)
 
         # ---- INÍCIO DA CONFIGURAÇÃO DO AGGRID ----
@@ -2644,7 +2649,7 @@ if not df_resultados.empty:
         # --- 2. Formatação Condicional de Cores ---
         cols_para_cor = [
             col for col in df_resultados_para_aggrid.columns
-            if 'Energia' in col or 'Potência' in col or 'Custo Total' in col
+            if '(€/kWh)' in col or '(€/dia)' in col or 'Total (€)' == col
         ]
         min_max_data_for_js = {}
 
@@ -2728,25 +2733,39 @@ if not df_resultados.empty:
         tooltip_preco_energia_js = JsCode("""
         function(params) {
             if (!params.data) { 
-                console.error("Tooltip Energia: params.data está AUSENTE para a célula com valor:", params.value, "e coluna:", params.colDef.field);
-        return String(params.value); 
+                // console.error("Tooltip Energia: params.data está AUSENTE para a célula com valor:", params.value, "e coluna:", params.colDef.field);
+                // Decidi retornar apenas o valor da célula se não houver dados, em vez de uma string de erro no tooltip.
                 return String(params.value); 
             }
                                                   
-                const colField = params.colDef.field;
-                let periodoKey = "";
-                if (colField.includes("Simples")) periodoKey = "S";
-                else if (colField.includes("Fora Vazio")) periodoKey = "F";
-                else if (colField.includes("Vazio")) periodoKey = "V";
-                else if (colField.includes("Cheias")) periodoKey = "C";
-                else if (colField.includes("Ponta")) periodoKey = "P";
+            const colField = params.colDef.field;
+            let periodoKey = "";
+            let nomePeriodoCompletoParaTitulo = "Energia"; // Um default caso algo falhe
+
+            // Determinar a chave do período e o nome completo para o título
+            if (colField.includes("Simples")) {
+                periodoKey = "S";
+                nomePeriodoCompletoParaTitulo = "Simples";
+            } else if (colField.includes("Fora Vazio")) { // Importante verificar "Fora Vazio" antes de "Vazio"
+                periodoKey = "F";
+                nomePeriodoCompletoParaTitulo = "Fora Vazio";
+            } else if (colField.includes("Vazio")) {
+                periodoKey = "V";
+                nomePeriodoCompletoParaTitulo = "Vazio";
+            } else if (colField.includes("Cheias")) {
+                periodoKey = "C";
+                nomePeriodoCompletoParaTitulo = "Cheias";
+            } else if (colField.includes("Ponta")) {
+                periodoKey = "P";
+                nomePeriodoCompletoParaTitulo = "Ponta";
+            }
 
             if (!periodoKey) {
-                console.error("Tooltip Energia: Não foi possível identificar o período a partir de colField:", colField);
-                return String(params.value);
+                // console.error("Tooltip Energia: Não foi possível identificar o período a partir de colField:", colField);
+                return String(params.value); // Retorna o valor da célula se o período não for identificado
             }
     
-            // Nomes exatos dos campos como definidos em Python e adicionados a colunas_dados_tooltip
+            // Nomes exatos dos campos como definidos em Python
             const field_comerc = 'tooltip_energia_' + periodoKey + '_comerc_sem_tar';
             const field_tar_bruta = 'tooltip_energia_' + periodoKey + '_tar_bruta';
             const field_tse_declarado = 'tooltip_energia_' + periodoKey + '_tse_declarado_incluido';
@@ -2754,7 +2773,7 @@ if not df_resultados.empty:
             const field_ts_aplicada = 'tooltip_energia_' + periodoKey + '_ts_aplicada_flag';
             const field_ts_desconto = 'tooltip_energia_' + periodoKey + '_ts_desconto_valor';
 
-            // Verificar se os campos existem e têm valores
+            // Verificar se os campos de dados necessários para o tooltip existem
             if (typeof params.data[field_comerc] === 'undefined' || 
                 typeof params.data[field_tar_bruta] === 'undefined' ||
                 typeof params.data[field_tse_declarado] === 'undefined' ||
@@ -2762,20 +2781,10 @@ if not df_resultados.empty:
                 typeof params.data[field_ts_aplicada] === 'undefined' ||
                 typeof params.data[field_ts_desconto] === 'undefined') {
         
-                console.warn("Tooltip Energia (" + periodoKey + "): Um ou mais campos de dados para o tooltip estão UNDEFINED. Coluna:", colField);
-                // Log para ver quais campos estão faltando
-                console.log({
-                    [field_comerc]: params.data[field_comerc],
-                    [field_tar_bruta]: params.data[field_tar_bruta],
-                    [field_tse_declarado]: params.data[field_tse_declarado],
-                    [field_tse_nominal]: params.data[field_tse_nominal],
-                    [field_ts_aplicada]: params.data[field_ts_aplicada],
-                    [field_ts_desconto]: params.data[field_ts_desconto]
-                });
-                return "Info decomposição indisponível."; // Ou só o valor da célula
+                // console.warn("Tooltip Energia (" + periodoKey + "): Um ou mais campos de dados para o tooltip estão UNDEFINED. Coluna:", colField);
+                return "Info decomposição indisponível."; // Mensagem mais clara se os dados não estiverem lá
             }
                                           
-
             const comercializador = parseFloat(params.data[field_comerc] || 0);
             const tarBruta = parseFloat(params.data[field_tar_bruta] || 0);
             const tseDeclaradoIncluido = params.data[field_tse_declarado]; // Booleano
@@ -2787,28 +2796,31 @@ if not df_resultados.empty:
                 if (typeof num === 'number' && !isNaN(num)) {
                     return num.toFixed(decimalPlaces);
                 }
-                console.warn("formatPrice (Energia): Tentativa de formatar valor não numérico:", num);
+                // console.warn("formatPrice (Energia): Tentativa de formatar valor não numérico:", num);
                 return 'N/A';
             };
-                                          
-            let tooltipParts = ["<b>Decomposição Preço Energia (s/IVA):</b>"];
+            
+            // MODIFICADO: Construir o título dinamicamente
+            let tituloTooltip = "<b>Decomposição Preço " + nomePeriodoCompletoParaTitulo + " (s/IVA):</b>";
+            let tooltipParts = [tituloTooltip];
+
             tooltipParts.push("Comercializador (s/TAR): " + formatPrice(comercializador, 4) + " €/kWh");
             tooltipParts.push("TAR (Tarifa Acesso Redes): " + formatPrice(tarBruta, 4) + " €/kWh");
 
             if (tseDeclaradoIncluido === true) {
                 tooltipParts.push("<i>(Financiamento TSE incluído no preço)</i>");
-            } else if (tseDeclaradoIncluido === false) { 
+            } else if (tseDeclaradoIncluido === false && tseValorNominal > 0) { // Mostrar apenas se houver valor
                 tooltipParts.push("Financiamento TSE: " + formatPrice(tseValorNominal, 7) + " €/kWh");
-            } else {
-                console.warn("Tooltip Energia ("+periodoKey+"): Flag 'tseDeclaradoIncluido' tem valor inesperado:", tseDeclaradoIncluido);
-                tooltipParts.push("<i>(Info TSE indisponível)</i>");
+            } else if (tseDeclaradoIncluido !== true && tseDeclaradoIncluido !== false) { // Se não for booleano
+                // console.warn("Tooltip Energia ("+periodoKey+"): Flag 'tseDeclaradoIncluido' tem valor inesperado:", tseDeclaradoIncluido);
+                tooltipParts.push("<i>(Info Fin. TSE indisponível)</i>");
             }
     
             if (tsAplicadaEnergia === true && tsDescontoValorEnergia > 0) {
                 tooltipParts.push("Desconto Tarifa Social: -" + formatPrice(tsDescontoValorEnergia, 4) + " €/kWh");
             }
     
-            tooltipParts.push("----------------------------------------------------");
+            tooltipParts.push("----------------------------------------------------"); // Separador
             tooltipParts.push("<b>Custo Final : " + formatPrice(parseFloat(params.value), 4) + " €/kWh</b>");
     
             return tooltipParts.join("<br>");
@@ -2816,7 +2828,7 @@ if not df_resultados.empty:
         """)
 
         # Configuração Coluna 'Preço Energia Simples (€/kWh)'
-        col_energia_s_nome = 'Energia Simples (€/kWh)'
+        col_energia_s_nome = 'Simples (€/kWh)'
         if col_energia_s_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4
     
@@ -2851,7 +2863,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Vazio (€/kWh)'
-        col_energia_v_nome = 'Energia Vazio (€/kWh)'
+        col_energia_v_nome = 'Vazio (€/kWh)'
         if col_energia_v_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4
     
@@ -2886,7 +2898,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Fora Vazio (€/kWh)'
-        col_energia_f_nome = 'Energia Fora Vazio (€/kWh)'
+        col_energia_f_nome = 'Energia Vazio (€/kWh)'
         if col_energia_f_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2921,7 +2933,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Cheias (€/kWh)'
-        col_energia_c_nome = 'Energia Cheias (€/kWh)'
+        col_energia_c_nome = 'Cheias (€/kWh)'
         if col_energia_c_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4 # Preço energia geralmente tem mais casas decimais
     
@@ -2956,7 +2968,7 @@ if not df_resultados.empty:
             )
 
         # Configuração Coluna 'Preço Energia Ponta (€/kWh)'
-        col_energia_p_nome = 'Energia Ponta (€/kWh)'
+        col_energia_p_nome = 'Ponta (€/kWh)'
         if col_energia_p_nome in df_resultados_para_aggrid.columns:
             casas_decimais_energia = 4
     
@@ -3158,7 +3170,7 @@ if not df_resultados.empty:
         """)
 
         # Configuração Coluna 'Custo Total (€)'
-        col_custo_total_nome = 'Custo Total (€)'
+        col_custo_total_nome = 'Total (€)'
         if col_custo_total_nome in df_resultados_para_aggrid.columns:
             casas_decimais_total = 2
     
@@ -3397,21 +3409,144 @@ if not df_resultados.empty:
     * **Tipo**: Indica se o tarifário é:
         * `Fixo`: Preços de energia e potência são constantes.
         * `Indexado (Média)`: Preço da energia baseado na média do OMIE para os períodos horários.
-        * `Indexado (Quarto-Horário)`: Preço da energia baseado nos valores OMIE horários/quarto-horários e no perfil de consumo.
+        * `Indexado (Quarto-Horário)`: Preço da energia baseado nos valores OMIE horários/quarto-horários e no perfil de consumo. Também conhecidos como "Dinâmicos".
         * `Pessoal`: O seu tarifário, conforme introduzido.
     * **Comercializador**: Empresa que oferece o tarifário.
-    * **Energia [...] (€/kWh)**: Custo unitário da energia para o período indicado (Simples, Vazio, Fora Vazio, Cheias, Ponta), **sem IVA**.
+    * **[...] (€/kWh)**: Custo unitário da energia para o período indicado (Simples, Vazio, Fora Vazio, Cheias, Ponta), **sem IVA**.
         * Para "O Meu Tarifário", este valor já reflete quaisquer descontos percentuais de energia e o desconto da Tarifa Social que tenhas configurado.
         * Para os outros tarifários, é o preço base sem IVA, já considerando o desconto da Tarifa Social se ativa.
     * **Potência (€/dia)**: Custo unitário diário da potência contratada e Termo Fixo **sem IVA**.
         * Para "O Meu Tarifário", este valor já reflete quaisquer descontos percentuais de potência e o desconto da Tarifa Social que tenhas configurado.
         * Para os outros tarifários, é o preço base sem IVA, já considerando o desconto da Tarifa Social se ativa.
-    * **Custo Total (€)**: Valor final estimado da fatura para o período simulado. Este custo inclui:
+    * **Total (€)**: Valor do custo final estimado da fatura para o período simulado. Este custo inclui:
         * Custo da energia consumida (com IVA aplicado conforme as regras).
         * Custo da potência contratada (com IVA aplicado conforme as regras).
         * Taxas adicionais: IEC (Imposto Especial de Consumo, isento com Tarifa Social), DGEG (Taxa de Exploração da Direção-Geral de Energia e Geologia) e CAV (Contribuição Audiovisual).
         * Quaisquer descontos de fatura em euros (para "O Meu Tarifário" ou especificados nos tarifários).
     """)
 
+
+    st.subheader("🎨 Legenda de Cores por Tipo de Tarifário")
+
+# Cores para "O Meu Tarifário" (replicar do JS)
+    cor_fundo_meu_tarifario_legenda = "red"
+    cor_texto_meu_tarifario_legenda = "white"
+
+    cor_fundo_fixo_legenda = "#FFFFFF" # Exemplo: branco
+    cor_texto_fixo_legenda = "#333333"   # Exemplo: texto escuro
+    borda_fixo_legenda = "#CCCCCC"     # Borda para o quadrado branco ser visível
+
+# Usar f-strings para construir o HTML da legenda
+    legenda_html = f"""
+    <div style="font-size: 14px;">
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 18px; height: 18px; background-color: {cor_fundo_meu_tarifario_legenda}; border: 1px solid #ccc; border-radius: 4px; margin-right: 8px;"></div>
+            <span style="background-color: {cor_fundo_meu_tarifario_legenda}; color: {cor_texto_meu_tarifario_legenda}; padding: 2px 6px; border-radius: 4px; font-weight: bold;">O Meu Tarifário</span>
+            <span style="margin-left: 8px;">- Tarifário configurado pelo utilizador.</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 18px; height: 18px; background-color: {cor_fundo_indexado_media_css}; border: 1px solid #ccc; border-radius: 4px; margin-right: 8px;"></div>
+            <span style="background-color: {cor_fundo_indexado_media_css}; color: {cor_texto_indexado_media_css}; padding: 2px 6px; border-radius: 4px;">Indexado (Média)</span>
+            <span style="margin-left: 8px;">- Preço de energia baseado na média OMIE do período definido.</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 18px; height: 18px; background-color: {cor_fundo_indexado_dinamico_css}; border: 1px solid #ccc; border-radius: 4px; margin-right: 8px;"></div>
+            <span style="background-color: {cor_fundo_indexado_dinamico_css}; color: {cor_texto_indexado_dinamico_css}; padding: 2px 6px; border-radius: 4px;">Indexado (Quarto-Horário)</span>
+            <span style="margin-left: 8px;">- Preço de energia baseado nos valores OMIE horários/quarto-horários e perfil.</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 18px; height: 18px; background-color: {cor_fundo_fixo_legenda}; border: 1px solid {borda_fixo_legenda}; border-radius: 4px; margin-right: 8px;"></div>
+            <span style="background-color: {cor_fundo_fixo_legenda}; color: {cor_texto_fixo_legenda}; padding: 2px 6px; border-radius: 4px;">Tarifário Fixo / Pessoal (Outro)</span>
+            <span style="margin-left: 8px;">- Preços constantes ou sem formatação de cor específica.</span>
+        </div>
+    </div>
+    """
+    st.markdown(legenda_html, unsafe_allow_html=True)
+
+
+
 else: # df_resultados original estava vazio
     st.info("Não foram encontrados tarifários para a opção selecionada.")
+
+st.markdown("---")
+
+# Título para as redes sociais
+st.subheader("Redes sociais, onde poderão seguir o projeto:")
+
+# URLs das redes sociais
+url_x = "https://x.com/tiagofelicia"
+url_bluesky = "https://bsky.app/profile/tiagofelicia.bsky.social"
+url_youtube = "https://youtube.com/@tiagofelicia"
+url_facebook_perfil = "https://www.facebook.com/profile.php?id=61555007360529"
+
+
+icon_url_x = "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/x.svg" # Exemplo de SVG (pode ser preto, ajustar cor se necessário)
+icon_url_bluesky = "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/bluesky.svg" # Exemplo de SVG
+icon_url_youtube = "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/youtube.svg" # Exemplo de SVG
+icon_url_facebook = "https://cdn.jsdelivr.net/npm/simple-icons@v11/icons/facebook.svg" # Exemplo de SVG
+
+# Estilo para os ícones SVG para controlar a cor no modo escuro (se forem pretos por defeito)
+# Se os teus ícones já tiverem as cores corretas ou forem PNGs coloridos, podes remover o 'filter'
+svg_icon_style_dark_mode_friendly = "filter: invert(0.8) sepia(0) saturate(1) hue-rotate(0deg) brightness(1.5) contrast(0.8);" # Ajustar para melhor resultado
+# Para os ícones do simpleicons.org, eles costumam ser monocromáticos e herdam a cor do texto.
+# Se usares SVGs que não herdam cor, ou se os teus ícones forem imagens (PNG/JPG),
+# ignora o svg_icon_style_dark_mode_friendly ou ajusta o estilo da tag <img> diretamente.
+# Para os ícones coloridos como na tua imagem, o style na tag <img> é mais para tamanho e margem.
+
+col_social1, col_social2, col_social3, col_social4 = st.columns(4)
+
+with col_social1:
+    st.markdown(
+        f"""
+        <a href="{url_x}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_x}" width="40" alt="X / Twitter" style="margin-bottom: 8px; object-fit: contain;">
+            X / Twitter
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+with col_social2:
+    st.markdown(
+        f"""
+        <a href="{url_bluesky}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_bluesky}" width="40" alt="Bluesky" style="margin-bottom: 8px; object-fit: contain;">
+            Bluesky
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+with col_social3:
+    st.markdown(
+        f"""
+        <a href="{url_youtube}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_youtube}" width="40" alt="YouTube" style="margin-bottom: 8px; object-fit: contain;">
+            YouTube
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+with col_social4:
+    st.markdown(
+        f"""
+        <a href="{url_facebook_perfil}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_facebook}" width="40" alt="Facebook" style="margin-bottom: 8px; object-fit: contain;">
+            Facebook
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+st.markdown("<br>", unsafe_allow_html=True) # Adiciona um espaço vertical
+
+# Texto de Copyright
+ano_copyright = 2025
+nome_autor = "Tiago Felícia"
+texto_copyright_html = f"© {ano_copyright} Todos os direitos reservados | {nome_autor} | <a href='{url_facebook_perfil}' target='_blank' style='color: inherit;'>Facebook</a>"
+
+st.markdown(
+    f"<div style='text-align: center; font-size: 0.9em; color: grey;'>{texto_copyright_html}</div>",
+    unsafe_allow_html=True
+)
