@@ -1735,10 +1735,10 @@ if comparar_indexados:
             # --- CALCULAR PREÇO BASE INDEXADO (input energia) ---
                 # --- BLOCO 1: Cálculo para Indexados Quarto-Horários (BTN ou Luzboa "BTN SPOTDEF") ---
                 # Assume que 'BTN' em formula_energia ou o nome Luzboa identifica corretamente estes tarifários
-            if 'BTN' in formula_energia or nome_tarifario == "Luzboa \"BTN SPOTDEF\"":
+            if 'BTN' in formula_energia or nome_tarifario == "Luzboa - BTN SPOTDEF":
 
-                # --- Tratamento especial para Luzboa "BTN SPOTDEF" ---
-                if nome_tarifario == "Luzboa \"BTN SPOTDEF\"":
+                # --- Tratamento especial para Luzboa - BTN SPOTDEF ---
+                if nome_tarifario == "Luzboa - BTN SPOTDEF":
                     # [LÓGICA LUZBOA - Mantida como estava na versão anterior que funcionava]
                     soma_luzboa_simples, count_luzboa_simples = 0.0, 0
                     soma_luzboa_vazio, count_luzboa_vazio = 0.0, 0
@@ -1817,15 +1817,16 @@ if comparar_indexados:
 
                             calculo_instantaneo_sem_perfil = 0.0
                             # --- Fórmulas específicas BTN ---
-                            if nome_tarifario == "Coopérnico \"Base\" 2.0": calculo_instantaneo_sem_perfil = (omie + constantes.get('Coop_CS_CR', 0.0) + constantes.get('Coop_K', 0.0)) * perdas
-                            elif nome_tarifario == "Repsol \"Leve Sem Mais\"": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 1.0) + constantes.get('Repsol_Q_Tarifa', 0.0))
-                            elif nome_tarifario == "Galp \"Plano Flexível / Dinâmico\"": calculo_instantaneo_sem_perfil = (omie + constantes.get('Galp_Ci', 0.0)) * perdas
+                            if nome_tarifario == "Coopérnico Base 2.0": calculo_instantaneo_sem_perfil = (omie + constantes.get('Coop_CS_CR', 0.0) + constantes.get('Coop_K', 0.0)) * perdas
+                            elif nome_tarifario == "Repsol - Leve Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 1.0) + constantes.get('Repsol_Q_Tarifa', 0.0))
+                            elif nome_tarifario == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil = (omie + constantes.get('Galp_Ci', 0.0)) * perdas
                             elif nome_tarifario == "Alfa Energia - ALFA POWER INDEX BTN": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Alfa_CGS', 0.0)) * perdas + constantes.get('Alfa_K', 0.0))
-                            elif nome_tarifario == "Plenitude \"Tendência\"": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0)) * perdas + constantes.get('Plenitude_Fee', 0.0))
+                            elif nome_tarifario == "Plenitude - Tendência Plus": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0)) * perdas + constantes.get('Plenitude_Fee', 0.0))
                             elif nome_tarifario == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil = (omie + constantes.get('Meo_K', 0.0)) * perdas
-                            elif nome_tarifario == "EDP \"Eletricidade Indexada Horária\"": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
+                            elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
                             elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
                             elif nome_tarifario == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil = (omie * constantes.get('G9_FA', 1.0) * perdas + constantes.get('G9_CGS', 0.0) + constantes.get('G9_AC', 0.0))
+
                             else: calculo_instantaneo_sem_perfil = omie * perdas # Fallback genérico
                             # --- Fim Fórmulas ---
 
@@ -1848,7 +1849,7 @@ if comparar_indexados:
                             
                         prec = 4
                         # --- Cálculo de preços FINAIS para BTN ---
-                        if nome_tarifario == "Repsol \"Leve Sem Mais\"":
+                        if nome_tarifario == "Repsol - Leve Sem Mais":
                             # Repsol usa sempre o preço calculado como se fosse Simples
                             preco_simples_repsol = round(soma_calculo_simples / soma_perfil_simples, prec) if soma_perfil_simples > 0 else 0.0
                             preco_energia_simples_indexado = preco_simples_repsol
@@ -1881,36 +1882,36 @@ if comparar_indexados:
                 if opcao_horaria.lower() == "simples":
                     perdas_a_usar = perdas_medias.get('Perdas_Anual_S', 1.0) # Usa Anual Simples
                     omie_a_usar = omie_medio_simples_input_kwh if omie_medio_simples_input_kwh is not None else 0.0
-                    if nome_tarifario == "Iberdrola \"Simples Indexado\"": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('Iberdrola_Perdas', 1.0) + constantes.get("Iberdrola_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0), prec)
-                    elif nome_tarifario == "Goldenergy \"Tarifário Indexado 100%\"":
+                    if nome_tarifario == "Iberdrola - Simples Indexado": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('Iberdrola_Perdas', 1.0) + constantes.get("Iberdrola_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0), prec)
+                    elif nome_tarifario == "Goldenergy - Tarifário Indexado 100%":
                         mes_num_calculo = list(dias_mes.keys()).index(mes) + 1; perdas_mensais_ge_map = {1: 1.29, 2: 1.18, 3: 1.18, 4: 1.15, 5: 1.11, 6: 1.10, 7: 1.15, 8: 1.13, 9: 1.10, 10: 1.10, 11: 1.16, 12: 1.25}; perdas_mensais_ge = perdas_mensais_ge_map.get(mes_num_calculo, 1.0)
                         preco_energia_simples_indexado = round(omie_a_usar * perdas_mensais_ge + constantes.get('GE_Q_Tarifa', 0.0) + constantes.get('GE_CG', 0.0), prec)
-                    elif nome_tarifario == "Endesa Tarifa Indexada": preco_energia_simples_indexado = round(omie_a_usar + constantes.get('Endesa_A_S', 0.0), prec)
-                    elif nome_tarifario == "LUZiGÁS \"Energy 8.8\"": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Luzigas_8_8_K', 0.0) + constantes.get('Luzigas_CGS', 0.0)) * perdas_a_usar, prec)
-                    elif nome_tarifario == "LUZiGÁS \"Dinâmico Poupança +\"": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Luzigas_D_K', 0.0) + constantes.get('Luzigas_CGS', 0.0)) * perdas_a_usar, prec)
-                    elif nome_tarifario == "Ibelectra \"Solução Família\"": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Ibelectra_CS', 0.0)) * perdas_a_usar + constantes.get('Ibelectra_K', 0.0), prec)
+                    elif nome_tarifario == "Endesa - Tarifa Indexada": preco_energia_simples_indexado = round(omie_a_usar + constantes.get('Endesa_A_S', 0.0), prec)
+                    elif nome_tarifario == "LUZiGÁS - Energy 8.8": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Luzigas_8_8_K', 0.0) + constantes.get('Luzigas_CGS', 0.0)) * perdas_a_usar, prec)
+                    elif nome_tarifario == "LUZiGÁS - Dinâmico Poupança +": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Luzigas_D_K', 0.0) + constantes.get('Luzigas_CGS', 0.0)) * perdas_a_usar, prec)
+                    elif nome_tarifario == "Ibelectra - Solução Família": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Ibelectra_CS', 0.0)) * perdas_a_usar + constantes.get('Ibelectra_K', 0.0), prec)
                     elif nome_tarifario == "G9 - Smart Index": preco_energia_simples_indexado = round((omie_a_usar * constantes.get('G9_FA', 1.02)) * perdas_medias.get('Perdas_M_S', 1.16) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec)
-                    elif nome_tarifario == "EDP \"Eletricidade Indexada Média\"": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('EDP_M_Perdas', 1.0) * constantes.get('EDP_M_K1', 1.0) + constantes.get('EDP_M_K2', 0.0), prec)
+                    elif nome_tarifario == "EDP - Eletricidade Indexada Média": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('EDP_M_Perdas', 1.0) * constantes.get('EDP_M_K1', 1.0) + constantes.get('EDP_M_K2', 0.0), prec)
                     else: st.warning(f"Fórmula não definida para tarifário médio Simples: {nome_tarifario}"); preco_energia_simples_indexado = omie_a_usar
                 elif opcao_horaria.lower().startswith("bi"):
                     ciclo_bi = 'BD' if "Diário" in opcao_horaria else 'BS'
                     perdas_v_anual = perdas_medias.get(f'Perdas_Anual_{ciclo_bi}_V', 1.0); perdas_f_anual = perdas_medias.get(f'Perdas_Anual_{ciclo_bi}_F', 1.0)
                     omie_v_a_usar = omie_medio_vazio_kwh if omie_medio_vazio_kwh is not None else 0.0; omie_f_a_usar = omie_medio_fv_kwh if omie_medio_fv_kwh is not None else 0.0
-                    if nome_tarifario == "LUZiGÁS \"Energy 8.8\"": k_luzigas = constantes.get('Luzigas_8_8_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_fora_vazio_indexado = round(calc_base * perdas_f_anual, prec)
-                    elif nome_tarifario == "LUZiGÁS \"Dinâmico Poupança +\"": k_luzigas = constantes.get('Luzigas_D_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_fora_vazio_indexado = round(calc_base * perdas_f_anual, prec)
-                    elif nome_tarifario == "Endesa Tarifa Indexada": preco_energia_vazio_indexado = round(omie_v_a_usar + constantes.get('Endesa_A_V', 0.0), prec); preco_energia_fora_vazio_indexado = round(omie_f_a_usar + constantes.get('Endesa_A_FV', 0.0), prec)
-                    elif nome_tarifario == "Ibelectra \"Solução Família\"": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_fora_vazio_indexado = round((omie_f_a_usar + cs_ib) * perdas_f_anual + k_ib, prec)                    
+                    if nome_tarifario == "LUZiGÁS - Energy 8.8": k_luzigas = constantes.get('Luzigas_8_8_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_fora_vazio_indexado = round(calc_base * perdas_f_anual, prec)
+                    elif nome_tarifario == "LUZiGÁS - Dinâmico Poupança +": k_luzigas = constantes.get('Luzigas_D_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_fora_vazio_indexado = round(calc_base * perdas_f_anual, prec)
+                    elif nome_tarifario == "Endesa - Tarifa Indexada": preco_energia_vazio_indexado = round(omie_v_a_usar + constantes.get('Endesa_A_V', 0.0), prec); preco_energia_fora_vazio_indexado = round(omie_f_a_usar + constantes.get('Endesa_A_FV', 0.0), prec)
+                    elif nome_tarifario == "Ibelectra - Solução Família": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_fora_vazio_indexado = round((omie_f_a_usar + cs_ib) * perdas_f_anual + k_ib, prec)                    
                     elif nome_tarifario == "G9 - Smart Index": preco_energia_vazio_indexado = round((omie_v_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_bi}_V', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec); preco_energia_fora_vazio_indexado = round((omie_f_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_bi}_F', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec)                    
-                    elif nome_tarifario == "EDP \"Eletricidade Indexada Média\"": perdas_const_edp = constantes.get('EDP_M_Perdas', 1.0); k1_edp = constantes.get('EDP_M_K1', 1.0); k2_edp = constantes.get('EDP_M_K2', 0.0); preco_energia_vazio_indexado = round(omie_v_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_fora_vazio_indexado = round(omie_f_a_usar * perdas_const_edp * k1_edp + k2_edp, prec)
+                    elif nome_tarifario == "EDP - Eletricidade Indexada Média": perdas_const_edp = constantes.get('EDP_M_Perdas', 1.0); k1_edp = constantes.get('EDP_M_K1', 1.0); k2_edp = constantes.get('EDP_M_K2', 0.0); preco_energia_vazio_indexado = round(omie_v_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_fora_vazio_indexado = round(omie_f_a_usar * perdas_const_edp * k1_edp + k2_edp, prec)
                     else: st.warning(f"Fórmula não definida para tarifário médio Bi-horário: {nome_tarifario}"); preco_energia_vazio_indexado = omie_v_a_usar; preco_energia_fora_vazio_indexado = omie_f_a_usar
                 elif opcao_horaria.lower().startswith("tri"):
                     ciclo_tri = 'TD' if "Diário" in opcao_horaria else 'TS'; perdas_v_anual = perdas_medias.get(f'Perdas_Anual_{ciclo_tri}_V', 1.0); perdas_c_anual = perdas_medias.get(f'Perdas_Anual_{ciclo_tri}_C', 1.0); perdas_p_anual = perdas_medias.get(f'Perdas_Anual_{ciclo_tri}_P', 1.0)
                     omie_v_a_usar = omie_medio_vazio_kwh if omie_medio_vazio_kwh is not None else 0.0; omie_c_a_usar = omie_medio_cheias_kwh if omie_medio_cheias_kwh is not None else 0.0; omie_p_a_usar = omie_medio_ponta_kwh if omie_medio_ponta_kwh is not None else 0.0
-                    if nome_tarifario == "LUZiGÁS \"Energy 8.8\"": k_luzigas = constantes.get('Luzigas_8_8_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_cheias_indexado = round(calc_base * perdas_c_anual, prec); preco_energia_ponta_indexado = round(calc_base * perdas_p_anual, prec)
-                    elif nome_tarifario == "LUZiGÁS \"Dinâmico Poupança +\"": k_luzigas = constantes.get('Luzigas_D_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_cheias_indexado = round(calc_base * perdas_c_anual, prec); preco_energia_ponta_indexado = round(calc_base * perdas_p_anual, prec)
-                    elif nome_tarifario == "Ibelectra \"Solução Família\"": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_cheias_indexado = round((omie_c_a_usar + cs_ib) * perdas_c_anual + k_ib, prec); preco_energia_ponta_indexado = round((omie_p_a_usar + cs_ib) * perdas_p_anual + k_ib, prec)
+                    if nome_tarifario == "LUZiGÁS - Energy 8.8": k_luzigas = constantes.get('Luzigas_8_8_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_cheias_indexado = round(calc_base * perdas_c_anual, prec); preco_energia_ponta_indexado = round(calc_base * perdas_p_anual, prec)
+                    elif nome_tarifario == "LUZiGÁS - Dinâmico Poupança +": k_luzigas = constantes.get('Luzigas_D_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_cheias_indexado = round(calc_base * perdas_c_anual, prec); preco_energia_ponta_indexado = round(calc_base * perdas_p_anual, prec)
+                    elif nome_tarifario == "Ibelectra - Solução Família": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_cheias_indexado = round((omie_c_a_usar + cs_ib) * perdas_c_anual + k_ib, prec); preco_energia_ponta_indexado = round((omie_p_a_usar + cs_ib) * perdas_p_anual + k_ib, prec)
                     elif nome_tarifario == "G9 - Smart Index": preco_energia_vazio_indexado = round((omie_v_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_tri}_V', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec); preco_energia_cheias_indexado = round((omie_c_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_tri}_C', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec); preco_energia_ponta_indexado = round((omie_p_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_tri}_P', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec) 
-                    elif nome_tarifario == "EDP \"Eletricidade Indexada Média\"": perdas_const_edp = constantes.get('EDP_M_Perdas', 1.0); k1_edp = constantes.get('EDP_M_K1', 1.0); k2_edp = constantes.get('EDP_M_K2', 0.0); preco_energia_vazio_indexado = round(omie_v_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_cheias_indexado = round(omie_c_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_ponta_indexado = round(omie_p_a_usar * perdas_const_edp * k1_edp + k2_edp, prec)
+                    elif nome_tarifario == "EDP - Eletricidade Indexada Média": perdas_const_edp = constantes.get('EDP_M_Perdas', 1.0); k1_edp = constantes.get('EDP_M_K1', 1.0); k2_edp = constantes.get('EDP_M_K2', 0.0); preco_energia_vazio_indexado = round(omie_v_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_cheias_indexado = round(omie_c_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_ponta_indexado = round(omie_p_a_usar * perdas_const_edp * k1_edp + k2_edp, prec)
                     else: st.warning(f"Fórmula não definida para tarifário médio Tri-horário: {nome_tarifario}"); preco_energia_vazio_indexado = omie_v_a_usar; preco_energia_cheias_indexado = omie_c_a_usar; preco_energia_ponta_indexado = omie_p_a_usar
                 # --- FIM LÓGICA MÉDIA ---
 
@@ -2251,9 +2252,15 @@ st.markdown("---")
 st.subheader("💰 Tiago Felícia - Tarifários de Eletricidade")
 
 # --- Construir Resumo dos Inputs para Exibição ---
-resumo_html_parts = ["<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 25px;'>"]
-resumo_html_parts.append("<h5 style='margin-top:0; color: #333;'>Resumo da Simulação:</h5>")
+cor_texto_resumo = "#333333"  # Um cinza escuro, bom para fundos claros
+
+resumo_html_parts = [
+    # Adicionar 'color: cor_texto_resumo;' ao estilo do div principal
+    f"<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 25px; color: {cor_texto_resumo};'>"
+]
+resumo_html_parts.append(f"<h5 style='margin-top:0; color: {cor_texto_resumo};'>Resumo da Simulação:</h5>")
 resumo_html_parts.append("<ul style='list-style-type: none; padding-left: 0;'>")
+
 
 # 1. Potência contratada + Opção Horária e Ciclo
 resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>{potencia} kVA</b> em <b>{opcao_horaria}</b></li>")
@@ -2339,6 +2346,67 @@ if meu_tarifario_ativo and 'meu_tarifario_calculado' in st.session_state:
 
 df_resultados = pd.DataFrame(final_results_list)
 
+# --- INÍCIO DO BLOCO PARA EXIBIR POUPANÇA ---
+try:
+    if meu_tarifario_ativo and not df_resultados.empty:
+        meu_tarifario_linha = df_resultados[df_resultados['NomeParaExibir'].str.contains("O Meu Tarifário", case=False, na=False)]
+
+        if not meu_tarifario_linha.empty:
+            custo_meu_tarifario = meu_tarifario_linha['Custo Total (€)'].iloc[0]
+            nome_meu_tarifario = meu_tarifario_linha['NomeParaExibir'].iloc[0]
+
+            # Garantir que há valores válidos para calcular o mínimo
+            custos_validos = df_resultados['Custo Total (€)'].dropna()
+            if not custos_validos.empty:
+                custo_minimo_geral = custos_validos.min()
+                # idxmin() em custos_validos para evitar erro se houver apenas NaNs no original
+                linha_mais_barata_geral = df_resultados.loc[df_resultados['Custo Total (€)'] == custo_minimo_geral].iloc[0] # Mais seguro que idxmin se houver NaNs
+                nome_tarifario_mais_barato_geral = linha_mais_barata_geral['NomeParaExibir']
+
+                if custo_meu_tarifario > custo_minimo_geral:
+                    poupanca_abs = custo_meu_tarifario - custo_minimo_geral
+                    poupanca_rel = 0.0
+                    if custo_meu_tarifario != 0:
+                        poupanca_rel = (poupanca_abs / custo_meu_tarifario) * 100
+                    
+                    mensagem_poupanca_html = (
+                        f"<span style='color:red; font-weight:bold;'>Poupança entre '{nome_meu_tarifario}' ({custo_meu_tarifario:.2f}€) e o mais barato da lista "
+                        f"('{nome_tarifario_mais_barato_geral}' - {custo_minimo_geral:.2f}€): </span>" # Adicionado nome do mais barato
+                        f"<span style='color:red; font-weight:bold;'>{poupanca_abs:.2f}€</span> "
+                        f"<span style='color:red; font-weight:bold;'>({poupanca_rel:.2f}%).</span>"
+                    )
+                    st.markdown(mensagem_poupanca_html, unsafe_allow_html=True)
+                
+                elif custo_meu_tarifario == custo_minimo_geral:
+                    if nome_meu_tarifario == nome_tarifario_mais_barato_geral:
+                        outros_tarifarios_df = df_resultados[df_resultados['NomeParaExibir'] != nome_meu_tarifario]
+                        if outros_tarifarios_df.empty:
+                            st.markdown(f"<span style='color:green; font-weight:bold;'>'{nome_meu_tarifario}' ({custo_meu_tarifario:.2f}€) é o único na lista.</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"<span style='color:green; font-weight:bold;'>'{nome_meu_tarifario}' ({custo_meu_tarifario:.2f}€) já é o mais económico ou está entre os mais económicos!</span>", unsafe_allow_html=True)
+                    else: 
+                         st.markdown(f"<span style='color:black; font-weight:bold;'>'{nome_meu_tarifario}' ({custo_meu_tarifario:.2f}€) está entre os mais económicos, igualando '{nome_tarifario_mais_barato_geral}' ({custo_minimo_geral:.2f}€).</span>", unsafe_allow_html=True)
+                
+                else: # custo_meu_tarifario < custo_minimo_geral (Resolvido pela lógica de `custos_validos.min()`)
+                      # Este ramo agora significa que o meu tarifário é estritamente o mais barato.
+                      st.markdown(f"<span style='color:green; font-weight:bold;'>Parabéns!</span> O seu tarifário ('{nome_meu_tarifario}' - {custo_meu_tarifario:.2f}€) é o mais económico da lista!", unsafe_allow_html=True)
+            else:
+                # Este caso acontece se df_resultados['Custo Total (€)'] só tiver NaNs ou estiver vazio
+                st.info("Não foi possível determinar a poupança pois não há custos válidos para comparação.")
+        # else: "Meu Tarifário" não foi encontrado na lista, não faz nada
+    # else: meu_tarifario_ativo é False ou df_resultados está vazio, não faz nada
+
+except Exception as e_poupanca:
+    st.error(f"Erro ao processar a informação de poupança: {e_poupanca}")
+    # st.write("Debug - df_resultados no momento do erro de poupança:", df_resultados) # Para depuração
+
+#ATENÇÃO, PODE CAUSAR PROBLEMAS
+st.empty() # Às vezes, apenas adicionar/remover um elemento pode ajudar
+import time
+time.sleep(0.1) # Geralmente uma má ideia em apps Streamlit
+
+# --- FIM DO BLOCO PARA EXIBIR POUPANÇA ---
+
 if not df_resultados.empty:
     if vista_simplificada:
         # Definir a ordem específica para a vista simplificada
@@ -2358,6 +2426,7 @@ if not df_resultados.empty:
         col_order_visivel_aggrid.extend(['Potência (€/dia)'])
         col_order_visivel_aggrid.extend(['Tipo', 'Comercializador', 'Segmento', 'Faturação', 'Pagamento'])
         colunas_visiveis_presentes = [col for col in col_order_visivel_aggrid if col in df_resultados.columns]
+
 
 
     # --- NOVO: Definir colunas necessárias para os dados dos tooltips ---
@@ -2464,31 +2533,39 @@ if not df_resultados.empty:
 
         cell_style_nome_tarifario_js = JsCode(f"""
         function(params) {{
-            // Estilo base com cantos arredondados e padding
-            let baseStyle = {{ 
-            textAlign: 'center',
-            borderRadius: '5px', 
-            padding: '10px 10px'
-        }};                                  
+            // Estilo base aplicado a todas as células desta coluna
+            let styleToApply = {{ 
+                textAlign: 'center',
+                borderRadius: '5px',  // O teu borderRadius desejado
+                padding: '10px 10px'   // O teu padding desejado
+                // Podes adicionar um backgroundColor default para células não especiais aqui, se quiseres
+                // backgroundColor: '#f0f0f0' // Exemplo para tarifários fixos
+            }};                                  
 
             if (params.data) {{
                 const nomeExibir = params.data.NomeParaExibir;
                 const tipoTarifario = params.data.Tipo;
-                // console.log(`AgGrid Style - Nome: ${{nomeExibir}}, Tipo Recebido: ${{tipoTarifario}}`);
 
-                if (nomeExibir === 'O Meu Tarifário') {{
-                    return {{ backgroundColor: 'red', color: 'white', fontWeight: 'bold', textAlign: 'center' }};
+                // VERIFICA SE O NOME COMEÇA COM "O Meu Tarifário"
+                if (typeof nomeExibir === 'string' && nomeExibir.startsWith('O Meu Tarifário')) {{
+                    styleToApply.backgroundColor = 'red';
+                    styleToApply.color = 'white';
+                    styleToApply.fontWeight = 'bold';
                 }} else if (tipoTarifario === 'Indexado Média') {{
-                    return {{ backgroundColor: '{cor_fundo_indexado_media_css}', color: '{cor_texto_indexado_media_css}', textAlign: 'center' }};
+                    styleToApply.backgroundColor = '{cor_fundo_indexado_media_css}';
+                    styleToApply.color = '{cor_texto_indexado_media_css}';
                 }} else if (tipoTarifario === 'Indexado quarto-horário') {{
-                    return {{ backgroundColor: '{cor_fundo_indexado_dinamico_css}', color: '{cor_texto_indexado_dinamico_css}', textAlign: 'center' }};
-
+                    styleToApply.backgroundColor = '{cor_fundo_indexado_dinamico_css}';
+                    styleToApply.color = '{cor_texto_indexado_dinamico_css}';
                 }} else {{
-                    // Para tarifários fixos ou outros não especificados
-                    return {{textAlign: 'center'}}; // Retorna um objeto de estilo vazio em vez de null
+                    // Para tarifários fixos ou outros tipos não explicitamente coloridos acima.
+                    // Eles já terão o textAlign, borderRadius e padding do styleToApply.
+                    // Se quiseres um fundo específico para eles diferente do default do styleToApply, define aqui.
+                    // Ex: styleToApply.backgroundColor = '#e9ecef'; // Uma cor neutra para fixos
                 }}
+                return styleToApply;
             }}
-            return {{}}; // Default também um objeto vazio
+            return styleToApply; 
         }}
         """)
 
@@ -2763,7 +2840,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_energia_s_nome,
                 headerName=col_energia_s_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js,
@@ -2797,7 +2875,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_energia_v_nome,
                 headerName=col_energia_v_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js,
@@ -2831,7 +2910,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_energia_f_nome,
                 headerName=col_energia_f_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js,
@@ -2865,7 +2945,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_energia_c_nome,
                 headerName=col_energia_c_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js,
@@ -2899,7 +2980,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_energia_p_nome,
                 headerName=col_energia_p_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_energia_js,
@@ -2988,7 +3070,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_potencia_nome,
                 headerName=col_potencia_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_potencia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_preco_potencia_js,
@@ -3099,7 +3182,8 @@ if not df_resultados.empty:
             gb.configure_column(
                 field=col_custo_total_nome,
                 headerName=col_custo_total_nome,
-                type=["numericColumn", "numberColumnFilter"],
+                type=["numericColumn"],
+                filter=False,
                 valueFormatter=js_value_formatter_energia,
                 cellStyle=cell_style_cores_js,
                 tooltipValueGetter=tooltip_custo_total_js, 
@@ -3204,8 +3288,9 @@ if not df_resultados.empty:
         # --- 3. Formatação para "O Meu Tarifário" ---
         get_row_style_meu_tarifario_js = JsCode("""
         function(params) {
-            if (params.data && params.data.NomeParaExibir === 'O Meu Tarifário') {
-                return { fontWeight: 'bold' }; // Apenas negrito para a linha
+            // Verifica se params.data existe e se NomeParaExibir é uma string que COMEÇA COM "O Meu Tarifário"
+            if (params.data && typeof params.data.NomeParaExibir === 'string' && params.data.NomeParaExibir.startsWith('O Meu Tarifário')) {
+                return { fontWeight: 'bold' }; // Aplica negrito a toda a linha
             }
             return null; // Sem estilo especial para outras linhas
         }
@@ -3266,7 +3351,8 @@ if not df_resultados.empty:
 
         gb.configure_grid_options(
             domLayout='autoHeight', # Para altura automática
-            getRowStyle=get_row_style_meu_tarifario_js
+            getRowStyle=get_row_style_meu_tarifario_js,
+            suppressContextMenu=True  # Adicionado para desativar o menu de contexto
         )
 
         gb.configure_default_column(headerClass='center-header')
@@ -3302,17 +3388,9 @@ if not df_resultados.empty:
         )
         # ---- FIM DA CONFIGURAÇÃO DO AGGRID ----
 
-#    styler = df_resultados.style
-#    for col in cols_to_style:
-#        if col in df_resultados.columns:
-#            styler = styler.apply(apply_color_to_series, subset=[col])
 
-    # O Streamlit tem uma altura mínima interna para o dataframe (aprox. 400px para 10 linhas).
-    # O importante é que para muitas linhas, ele expanda.
-
-#    st.dataframe(styler, height=altura_total_tabela, use_container_width=True)
-
-    st.markdown("---") # Uma linha divisória opcional
+    # Legenda das Colunas da Tabela Tarifários de Eletricidade
+    st.markdown("---")
     st.subheader("📖 Legenda das Colunas da Tabela Tarifários de Eletricidade")
     st.caption("""
     * **Tarifário**: Nome identificativo do tarifário. Pode incluir notas sobre descontos de fatura específicos.
