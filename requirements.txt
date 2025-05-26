@@ -2,3 +2,4 @@ streamlit
 pandas
 openpyxl
 streamlit-aggrid
+beautifulsoup4
