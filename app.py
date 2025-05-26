@@ -271,7 +271,7 @@ def calcular_taxas_adicionais(consumo_kwh, dias, tarifa_social_bool, valor_dgeg_
 resultados_list = []
 col1, col2 = st.columns([1, 5])  # Ajuste as proporções conforme necessário
 with col1:
-    st.image("https://raw.githubusercontent.com/tiagofelicia/simulador-tarifarios-eletricidade/refs/heads/main/Logo_Tiago.png", width=180)
+    st.image("https://raw.githubusercontent.com/tiagofelicia/simulador-tarifarios-eletricidade/refs/heads/main/Logo_Tiago_Felicia.png", width=180)
 with col2:
     st.title("🔌 Tiago Felícia - Simulador de Tarifários de Eletricidade")
 
