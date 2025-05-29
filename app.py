@@ -4,6 +4,7 @@ import datetime
 import io
 import json
 import time
+import re
 
 from st_aggrid import AgGrid, GridOptionsBuilder
 from st_aggrid.shared import GridUpdateMode, JsCode
@@ -14,7 +15,7 @@ from openpyxl.utils import get_column_letter # Para nomes de colunas Excel
 st.set_page_config(page_title="Simulador de Tarifários de Eletricidade", layout="wide")
 
 # --- Carregar ficheiro Excel do GitHub ---
-@st.cache_data(ttl=3600, show_spinner=False) # Cache por 1 hora (3600 segundos)
+@st.cache_data(ttl=1800, show_spinner=False) # Cache por 30 minutos (1800 segundos)
 def carregar_dados_excel(url):
     xls = pd.ExcelFile(url)
     tarifarios_fixos = xls.parse("Tarifarios_fixos")
@@ -223,18 +224,45 @@ def calcular_custo_potencia_com_iva_final(preco_comercializador_dia_sem_iva, tar
     }
     return round(custo_total_com_iva, 4)
 
+IDENTIFICADORES_COMERCIALIZADORES_CAV_FIXA = [
+    "CUR",
+    "EDP",
+    "Galp",
+    "Goldenergy",
+    "Ibelectra",
+    "Iberdrola",
+    "Luzigás"
+    "Plenitude",
+    "YesEnergy"     
+    # Adicionar outros identificadores conforme necessário
+]
+
 # --- Função: Calcular taxas adicionais ---
-def calcular_taxas_adicionais(consumo_kwh, dias, tarifa_social_bool, valor_dgeg_mensal, valor_cav_mensal, valor_iec=0.001):
+def calcular_taxas_adicionais(
+    consumo_kwh,
+    dias_simulacao,           # O número de dias para o cálculo da simulação
+    tarifa_social_bool,
+    valor_dgeg_mensal,
+    valor_cav_mensal,   # O valor da CAV mensal (ex: 2.85€)
+    nome_comercializador_atual, # Nome do comercializador do tarifário em análise
+    mes_selecionado_simulacao,  # String do mês da simulação (ex: "Janeiro")
+    ano_simulacao_atual,      # Inteiro do ano da simulação (ex: 2025)
+    valor_iec=0.001           # Valor do IEC por kWh
+):
+    """
+    Calcula taxas adicionais (IEC, DGEG, CAV) com lógica ajustada para CAV mensal fixa
+    para comercializadores específicos em meses civis completos.
+    """
     iva_normal_perc = 0.23
-    iva_reduzido_perc = 0.06
+    iva_reduzido_perc = 0.06 # IVA da CAV é 6%
 
-    consumo_kwh = float(consumo_kwh or 0.0)
-    dias = int(dias or 0)
-    valor_dgeg_mensal = float(valor_dgeg_mensal or 0.0)
+    consumo_kwh_float = float(consumo_kwh or 0.0)
+    dias_simulacao_int = int(dias_simulacao or 0)
+    valor_dgeg_mensal_float = float(valor_dgeg_mensal or 0.0)
     valor_cav_mensal = float(valor_cav_mensal or 0.0)
-    valor_iec = float(valor_iec or 0.0)
+    valor_iec_float = float(valor_iec or 0.0)
 
-    if dias <= 0:
+    if dias_simulacao_int <= 0:
         return {
             'custo_com_iva': 0.0, 'custo_sem_iva': 0.0,
             'iec_sem_iva': 0.0, 'dgeg_sem_iva': 0.0, 'cav_sem_iva': 0.0,
@@ -242,9 +270,36 @@ def calcular_taxas_adicionais(consumo_kwh, dias, tarifa_social_bool, valor_dgeg_
         }
 
     # Custos Sem IVA
-    iec_siva = 0.0 if tarifa_social_bool else (consumo_kwh * valor_iec)
-    dgeg_siva = (valor_dgeg_mensal * 12 / 365.25 * dias)
-    cav_siva = (valor_cav_mensal * 12 / 365.25 * dias)
+    # IEC (Imposto Especial de Consumo)
+    iec_siva = 0.0 if tarifa_social_bool else (consumo_kwh_float * valor_iec_float)
+
+    # DGEG (Taxa de Exploração da Direção-Geral de Energia e Geologia) - sempre proporcional
+    dgeg_siva = (valor_dgeg_mensal_float * 12 / 365.25 * dias_simulacao_int)
+    cav_siva = 0.0
+    
+    # Obter o número de dias no mês civil selecionado para a simulação
+    # Utiliza o dicionário 'dias_mes' que já existe no seu script.
+    # (Assumindo que 'dias_mes' está acessível aqui ou é passado como argumento/global)
+    dias_no_mes_civil_selecionado = dias_mes.get(mes_selecionado_simulacao, 30) # Default 30 se mês não encontrado
+    if mes_selecionado_simulacao == "Fevereiro" and \
+       ((ano_simulacao_atual % 4 == 0 and ano_simulacao_atual % 100 != 0) or \
+        (ano_simulacao_atual % 400 == 0)):
+        dias_no_mes_civil_selecionado = 29
+
+    aplica_cav_fixa_mensal = False
+    if nome_comercializador_atual and isinstance(nome_comercializador_atual, str):
+        nome_comerc_lower_para_verificacao = nome_comercializador_atual.lower()
+        # Verifica se algum dos identificadores está contido no nome do comercializador
+        if any(identificador.lower() in nome_comerc_lower_para_verificacao for identificador in IDENTIFICADORES_COMERCIALIZADORES_CAV_FIXA):
+            # Se for um comercializador da lista, verifica se os dias da simulação correspondem ao mês completo
+            if dias_simulacao_int == dias_no_mes_civil_selecionado:
+                aplica_cav_fixa_mensal = True
+    
+    if aplica_cav_fixa_mensal:
+        cav_siva = valor_cav_mensal  # Aplica o valor mensal total da CAV
+    else:
+        # Cálculo proporcional padrão para os outros casos
+        cav_siva = (valor_cav_mensal * 12 / 365.25 * dias_simulacao_int)
 
     # Valores de IVA
     iva_iec = 0.0 if tarifa_social_bool else (iec_siva * iva_normal_perc)
@@ -663,37 +718,236 @@ if not df_omie_no_periodo_selecionado.empty and 'Perdas' in df_omie_no_periodo_s
 
 # --- Consumos ---
 st.subheader("⚡ Consumos")
+st.markdown(
+    "Introduza o consumo para cada período (kWh). Pode usar somas ou subtrações simples (ex: `100+50+30` ou `100+50-30`). Os valores serão arredondados para o inteiro mais próximo."
+)
 
+# Função para calcular a expressão de consumo (apenas para somas, resultado inteiro)
+def calcular_expressao_matematica_simples(expressao_str, periodo_label=""):
+    """
+    Calcula uma expressão matemática simples de adição e subtração, 
+    arredondando o resultado para o inteiro mais próximo.
+    Ex: '10+20-5', '10.5 - 2.5 + 0.5'
+    """
+    if not expressao_str or not isinstance(expressao_str, str):
+        return 0, f"Nenhum valor introduzido para {periodo_label}." if periodo_label else "Nenhum valor introduzido."
+
+    # 1. Validação de caracteres permitidos
+    # Permite dígitos, ponto decimal, operadores + e -, e espaços.
+    valid_chars = set('0123456789.+- ')
+    if not all(char in valid_chars for char in expressao_str):
+        return 0, f"Expressão inválida para {periodo_label}: '{expressao_str}'. Use apenas números, '.', '+', '-'. O resultado será arredondado."
+
+    expressao_limpa = expressao_str.replace(" ", "") # Remove todos os espaços
+    if not expressao_limpa: # Se após remover espaços a string estiver vazia
+        return 0, f"Expressão vazia para {periodo_label}."
+
+    # 2. Normalizar operadores duplos (ex: -- para +, +- para -)
+    # Este loop garante que sequências como "---" ou "-+-" são corretamente simplificadas.
+    temp_expr = expressao_limpa
+    while True:
+        prev_expr = temp_expr
+        temp_expr = temp_expr.replace("--", "+")
+        temp_expr = temp_expr.replace("+-", "-")
+        temp_expr = temp_expr.replace("-+", "-")
+        temp_expr = temp_expr.replace("++", "+")
+        if temp_expr == prev_expr: # Termina quando não há mais alterações
+            break
+    expressao_limpa = temp_expr
+
+    # 3. Verificar se a expressão é apenas um operador ou termina/começa invalidamente com um
+    if expressao_limpa in ["+", "-"] or \
+       expressao_limpa.endswith(("+", "-")) or \
+       (expressao_limpa.startswith(("+", "-")) and len(expressao_limpa) > 1 and expressao_limpa[1] in "+-"): # Ex: "++5", "-+5" já normalizado, mas evita "+5", "-5" aqui
+        if not ( (expressao_limpa.startswith(("+", "-")) and len(expressao_limpa) > 1 and expressao_limpa[1].isdigit()) or \
+                 (expressao_limpa.startswith(("+", "-")) and len(expressao_limpa) > 2 and expressao_limpa[1] == '.' and expressao_limpa[2].isdigit() ) ): # Permite "+5", "-5", "+.5", "-.5"
+            return 0, f"Expressão inválida para {periodo_label}: '{expressao_str}'. Formato de operador inválido."
+
+
+    # 4. Adicionar um '+' no início se a expressão começar com um número ou ponto decimal, para facilitar a divisão.
+    #    Ex: "10-5" -> "+10-5"; ".5+2" -> "+.5+2"
+    if expressao_limpa and (expressao_limpa[0].isdigit() or \
+        (expressao_limpa.startswith('.') and len(expressao_limpa) > 1 and expressao_limpa[1].isdigit())):
+        expressao_limpa = "+" + expressao_limpa
+    elif expressao_limpa.startswith('.') and not (len(expressao_limpa) > 1 and (expressao_limpa[1].isdigit() or expressao_limpa[1] in "+-")): # Casos como "." ou ".+"
+         return 0, f"Expressão inválida para {periodo_label}: '{expressao_str}'. Ponto decimal mal formatado."
+
+    # 5. Dividir a expressão em operadores ([+\-]) e os operandos que se seguem.
+    #    Ex: "+10.5-5" -> ['', '+', '10.5', '-', '5'] (o primeiro '' é por causa do split no início)
+    #    Ex: "-5+3" -> ['', '-', '5', '+', '3']
+    partes = re.split(r'([+\-])', expressao_limpa)
+    
+    # Filtrar strings vazias resultantes do split (principalmente a primeira se existir)
+    partes_filtradas = [p for p in partes if p]
+
+    if not partes_filtradas:
+        return 0, f"Expressão inválida para {periodo_label}: '{expressao_str}'. Não resultou em operandos válidos."
+
+    # A estrutura deve ser [operador, operando, operador, operando, ...]
+    # Portanto, o comprimento da lista filtrada deve ser par e pelo menos 2 (ex: ['+', '10'])
+    if len(partes_filtradas) % 2 != 0 or len(partes_filtradas) == 0:
+        return 0, f"Expressão mal formada para {periodo_label}: '{expressao_str}'. Estrutura de operadores/operandos inválida."
+
+    total = 0.0
+    try:
+        for i in range(0, len(partes_filtradas), 2):
+            operador = partes_filtradas[i]
+            operando_str = partes_filtradas[i+1]
+
+            if not operando_str : # Operando em falta
+                return 0, f"Expressão mal formada para {periodo_label}: '{expressao_str}'. Operando em falta após operador '{operador}'."
+
+            # Validação robusta do operando antes de converter para float
+            # Deve ser um número, pode conter um ponto decimal. Não pode ser apenas "."
+            if operando_str == '.' or not operando_str.replace('.', '', 1).isdigit():
+                 return 0, f"Operando inválido '{operando_str}' na expressão para {periodo_label}."
+            
+            valor_operando = float(operando_str)
+
+            if operador == '+':
+                total += valor_operando
+            elif operador == '-':
+                total -= valor_operando
+            else: 
+                # Esta condição não deve ser atingida devido ao re.split('([+\-])')
+                return 0, f"Operador desconhecido '{operador}' na expressão para {periodo_label}."
+
+    except ValueError: # Erro ao converter operando_str para float
+        return 0, f"Expressão inválida para {periodo_label}: '{expressao_str}'. Contém valor não numérico ou mal formatado."
+    except IndexError: # Falha ao aceder partes_filtradas[i+1], indica erro de parsing não apanhado antes.
+        return 0, f"Expressão mal formada para {periodo_label}: '{expressao_str}'. Estrutura inesperada."
+    except Exception as e: # Captura outras exceções inesperadas
+        return 0, f"Erro ao calcular expressão para {periodo_label} ('{expressao_str}'): {e}"
+
+    # Arredondar para o inteiro mais próximo
+    total_arredondado = int(round(total))
+
+    # Manter a lógica original de não permitir consumo negativo
+    if total_arredondado < 0:
+        return 0, f"Consumo calculado para {periodo_label} não pode ser negativo ({total_arredondado} kWh, calculado de {total:.4f} kWh)."
+    
+    return total_arredondado, None # Retorna o valor inteiro arredondado e nenhum erro
+
+# --- Lógica de Reset dos Inputs de Consumo ao Mudar Opção Horária ---
+# (Manter a lógica de reset que já tinha para as chaves 'exp_consumo_...')
+chave_opcao_horaria_consumo = f"consumo_inputs_para_{opcao_horaria}" # Esta chave pode ser simplificada
+if st.session_state.get('last_opcao_horaria_for_consumo_calc') != opcao_horaria:
+    st.session_state.last_opcao_horaria_for_consumo_calc = opcao_horaria
+    keys_exp_a_resetar = ['exp_consumo_s', 'exp_consumo_v', 'exp_consumo_f', 'exp_consumo_c', 'exp_consumo_p',
+                          'exp_consumo_s_anterior_valido', 'exp_consumo_v_anterior_valido', 
+                          'exp_consumo_f_anterior_valido', 'exp_consumo_tc_anterior_valido', 
+                          'exp_consumo_tp_anterior_valido', 'exp_consumo_tv_anterior_valido'] # Adicionar também as de _anterior_valido
+    for k_exp in keys_exp_a_resetar:
+        if k_exp in st.session_state:
+            del st.session_state[k_exp]
+    # Resetar os valores no session_state para os defaults da nova opcao_horaria
+    if opcao_horaria.lower() == "simples":
+        st.session_state.exp_consumo_s = "158"
+    elif opcao_horaria.lower().startswith("bi"):
+        st.session_state.exp_consumo_v = "63"
+        st.session_state.exp_consumo_f = "95"
+    elif opcao_horaria.lower().startswith("tri"):
+        st.session_state.exp_consumo_v = "63" # Reutilizando a chave para Vazio de bi
+        st.session_state.exp_consumo_c = "68"
+        st.session_state.exp_consumo_p = "27"
+
+
+# Inicializar as variáveis de consumo que serão usadas nos cálculos
 consumo_simples = 0
 consumo_vazio = 0
 consumo_fora_vazio = 0
 consumo_cheias = 0
 consumo_ponta = 0
+consumo = 0 # Total
 
 if opcao_horaria.lower() == "simples":
-    consumo_simples = st.number_input("Consumo Simples (kWh)", min_value=0, value=158, step=1, help="Preencha o consumo Simples. Se na sua fatura não estiver assim referido, o mesmo resulta da soma dos valores em Vazio, Cheias e Ponta")
+    st.markdown("###### Consumo Simples (kWh)")
+    expressao_s = st.text_input(
+        "Introduza o consumo total ou um cálculo (ex: 80+20+58 ou 200+58-100)",
+        value=st.session_state.get('exp_consumo_s', "158"), # Default como string inteira
+        key="exp_consumo_s_widget"
+    )
+    st.session_state.exp_consumo_s = expressao_s
+    
+    resultado_s_calc, erro_s = calcular_expressao_matematica_simples(expressao_s, "Simples")
+    
+    if erro_s:
+        st.error(erro_s)
+        consumo_simples = int(st.session_state.get('exp_consumo_s_anterior_valido', 0)) # Usar último válido ou 0
+    else:
+        consumo_simples = resultado_s_calc
+        st.session_state.exp_consumo_s_anterior_valido = consumo_simples # Guardar último valor válido
+        st.info(f"Consumo Simples considerado: **{consumo_simples:.0f} kWh**") # Exibe como inteiro
+    
     consumo = consumo_simples
+
 elif opcao_horaria.lower().startswith("bi"):
+    st.markdown("###### Consumos Bi-Horário (kWh)")
     col_bi1, col_bi2 = st.columns(2)
     with col_bi1:
-        consumo_vazio = st.number_input("Consumo Vazio (kWh)", min_value=0, value=63, step=1, help="Preencha o consumo em Vazio")
+        expressao_v = st.text_input("Vazio (ex: 60+3 ou 70+3-10)", value=st.session_state.get('exp_consumo_v', "63"), key="exp_consumo_v_widget")
+        st.session_state.exp_consumo_v = expressao_v
+        consumo_vazio, erro_v = calcular_expressao_matematica_simples(expressao_v, "Vazio")
+        if erro_v: 
+            st.error(erro_v)
+            consumo_vazio = int(st.session_state.get('exp_consumo_v_anterior_valido', 0))
+        else:
+            st.session_state.exp_consumo_v_anterior_valido = consumo_vazio
+            st.info(f"Consumo Vazio considerado: **{consumo_vazio:.0f} kWh**")
     with col_bi2:
-        consumo_fora_vazio = st.number_input("Consumo Fora Vazio (kWh)", min_value=0, value=95, step=1, help="Preencha o consumo em Fora Vazio. Se na sua fatura não estiver assim referido, o mesmo resulta da soma dos valores em Cheias e Ponta")
+        expressao_f = st.text_input("Fora Vazio (ex: 90+5 ou 100+5-10)", value=st.session_state.get('exp_consumo_f', "95"), key="exp_consumo_f_widget")
+        st.session_state.exp_consumo_f = expressao_f
+        consumo_fora_vazio, erro_f = calcular_expressao_matematica_simples(expressao_f, "Fora Vazio")
+        if erro_f: 
+            st.error(erro_f)
+            consumo_fora_vazio = int(st.session_state.get('exp_consumo_f_anterior_valido', 0))
+        else:
+            st.session_state.exp_consumo_f_anterior_valido = consumo_fora_vazio
+            st.info(f"Consumo Fora Vazio considerado: **{consumo_fora_vazio:.0f} kWh**")
+        
     consumo = consumo_vazio + consumo_fora_vazio
+
 elif opcao_horaria.lower().startswith("tri"):
+    st.markdown("###### Consumos Tri-Horário (kWh)")
     col_tri1, col_tri2, col_tri3 = st.columns(3)
     with col_tri1:
-        consumo_vazio = st.number_input("Consumo Vazio (kWh)", min_value=0, value=63, step=1, help="Preencha o consumo em Vazio")
+        # Para Vazio em Tri, vamos usar uma chave de session_state diferente para o default se necessário, ou manter a de Bi
+        expressao_tv = st.text_input("Vazio (ex: 60+3 ou 70+3-10)", value=st.session_state.get('exp_consumo_v', "63"), key="exp_consumo_tv_widget") # Pode partilhar o default de 'exp_consumo_v' ou ter um 'exp_consumo_tv'
+        st.session_state.exp_consumo_v = expressao_tv # Atualiza a mesma chave 'exp_consumo_v' se for partilhado
+        consumo_vazio, erro_tv = calcular_expressao_matematica_simples(expressao_tv, "Vazio (Tri)")
+        if erro_tv: 
+            st.error(erro_tv)
+            consumo_vazio = int(st.session_state.get('exp_consumo_tv_anterior_valido', 0))
+        else:
+            st.session_state.exp_consumo_tv_anterior_valido = consumo_vazio
+            st.info(f"Consumo Vazio considerado: **{consumo_vazio:.0f} kWh**")
     with col_tri2:
-        consumo_cheias = st.number_input("Consumo Cheias (kWh)", min_value=0, value=68, step=1, help="Preencha o consumo em Cheias")
+        expressao_tc = st.text_input("Cheias (ex: 60+8 ou 70+8-10)", value=st.session_state.get('exp_consumo_c', "68"), key="exp_consumo_tc_widget")
+        st.session_state.exp_consumo_c = expressao_tc
+        consumo_cheias, erro_tc = calcular_expressao_matematica_simples(expressao_tc, "Cheias (Tri)")
+        if erro_tc: 
+            st.error(erro_tc)
+            consumo_cheias = int(st.session_state.get('exp_consumo_tc_anterior_valido', 0))
+        else:
+            st.session_state.exp_consumo_tc_anterior_valido = consumo_cheias
+            st.info(f"Consumo Cheias considerado: **{consumo_cheias:.0f} kWh**")
     with col_tri3:
-        consumo_ponta = st.number_input("Consumo Ponta (kWh)", min_value=0, value=27, step=1, help="Preencha o consumo em Ponta")
+        expressao_tp = st.text_input("Ponta (ex: 20+7 ou 30+7-10)", value=st.session_state.get('exp_consumo_p', "27"), key="exp_consumo_tp_widget")
+        st.session_state.exp_consumo_p = expressao_tp
+        consumo_ponta, erro_tp = calcular_expressao_matematica_simples(expressao_tp, "Ponta (Tri)")
+        if erro_tp: 
+            st.error(erro_tp)
+            consumo_ponta = int(st.session_state.get('exp_consumo_tp_anterior_valido', 0))
+        else:
+            st.session_state.exp_consumo_tp_anterior_valido = consumo_ponta
+            st.info(f"Consumo Ponta considerado: **{consumo_ponta:.0f} kWh**")
+        
     consumo = consumo_vazio + consumo_cheias + consumo_ponta
 
-st.write(f"Total Consumo: **{consumo:.0f} kWh**")
+st.write(f"Total Consumo a considerar nos cálculos: **{consumo:.0f} kWh**") # Exibir total como inteiro
+
 
 # ... (Restantes inputs: Taxas DGEG/CAV, Consumos, Opções Adicionais, Meu Tarifário) ...
-st.markdown("---")
 # Expander para as opções que são menos alteradas ou mais específicas
 with st.expander("Opções Adicionais de Simulação (Tarifa Social e condicionais)"):
     st.markdown("##### Definição de Taxas Mensais")
@@ -1062,7 +1316,10 @@ if meu_tarifario_ativo:
 
         decomposicao_taxas_meu = calcular_taxas_adicionais(
             consumo, dias, tarifa_social,
-            valor_dgeg_user, valor_cav_user
+            valor_dgeg_user, valor_cav_user,
+            nome_comercializador_atual="Pessoal",
+            mes_selecionado_simulacao=mes,
+            ano_simulacao_atual=ano_atual
         )
         taxas_meu_tarifario_com_iva = decomposicao_taxas_meu['custo_com_iva']
         # tt_cte_taxas_siva = decomposicao_taxas_meu['custo_sem_iva'] # Já teremos as taxas s/IVA individuais
@@ -1211,7 +1468,7 @@ if meu_tarifario_ativo:
             'LinkAdesao': "-",            
             'Tipo': "Pessoal",
             'Comercializador': "-",
-            'Segmento': "-",
+            'Segmento': "Pessoal",
             'Faturação': "-",
             'Pagamento': "-",          
             **valores_energia_meu_exibir_dict,
@@ -1384,10 +1641,14 @@ if not tarifarios_filtrados_fixos.empty:
             potencia
         )
 
+        comercializador_tarifario_tf = tarifario['comercializador'] # Nome do comercializador deste tarifário
+
         # --- Passo 7: Calcular Taxas Adicionais ---
         taxas_tf = calcular_taxas_adicionais(
             consumo, dias, tarifa_social,
-            valor_dgeg_user, valor_cav_user # Usar valores globais do user
+            valor_dgeg_user, valor_cav_user,
+            nome_comercializador_atual=comercializador_tarifario_tf,
+            mes_selecionado_simulacao=mes, ano_simulacao_atual=ano_atual
         )
 
         # --- Passo 8: Calcular Custo Total Final ---
@@ -1554,7 +1815,9 @@ if not tarifarios_filtrados_fixos.empty:
         # TAXAS ADICIONAIS (Tarifários Fixos)
         decomposicao_taxas_tf = calcular_taxas_adicionais(
             consumo, dias, tarifa_social,
-            valor_dgeg_user, valor_cav_user
+            valor_dgeg_user, valor_cav_user,
+            nome_comercializador_atual=comercializador_tarifario_tf,
+            mes_selecionado_simulacao=mes, ano_simulacao_atual=ano_atual
         )
         taxas_tf_com_iva = decomposicao_taxas_tf['custo_com_iva']
         tt_cte_iec_siva_tf = decomposicao_taxas_tf['iec_sem_iva']
@@ -1953,10 +2216,15 @@ if comparar_indexados:
                 potencia
             )
 
+            comercializador_tarifario_idx = tarifario_indexado['comercializador'] # Nome do comercializador
+
             # --- Passo 7: Calcular Taxas Adicionais ---
             taxas_idx = calcular_taxas_adicionais(
                 consumo, dias, tarifa_social,
-                valor_dgeg_user, valor_cav_user
+                valor_dgeg_user, valor_cav_user,
+                nome_comercializador_atual=comercializador_tarifario_idx, # Passa o comercializador
+                mes_selecionado_simulacao=mes,
+                ano_simulacao_atual=ano_atual
             )
 
             # --- Passo 8: Calcular Custo Total Final ---
@@ -2075,7 +2343,10 @@ if comparar_indexados:
             # TAXAS ADICIONAIS (Tarifários Indexados)
             decomposicao_taxas_idx = calcular_taxas_adicionais(
                 consumo, dias, tarifa_social,
-                valor_dgeg_user, valor_cav_user
+                valor_dgeg_user, valor_cav_user,
+                nome_comercializador_atual=comercializador_tarifario_idx, # Passa o comercializador
+                mes_selecionado_simulacao=mes,
+                ano_simulacao_atual=ano_atual
             )
             taxas_idx_com_iva = decomposicao_taxas_idx['custo_com_iva']
             tt_cte_iec_siva_idx = decomposicao_taxas_idx['iec_sem_iva']
@@ -2173,7 +2444,7 @@ cor_texto_resumo = "#333333"  # Um cinza escuro, bom para fundos claros
 
 resumo_html_parts = [
     # Adicionar 'color: cor_texto_resumo;' ao estilo do div principal
-    f"<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 25px; color: {cor_texto_resumo};'>"
+    f"<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 6px; margin-bottom: 25px; color: {cor_texto_resumo};'>"
 ]
 resumo_html_parts.append(f"<h5 style='margin-top:0; color: {cor_texto_resumo};'>Resumo da Simulação:</h5>")
 resumo_html_parts.append("<ul style='list-style-type: none; padding-left: 0;'>")
@@ -2251,6 +2522,8 @@ st.markdown(html_resumo_final, unsafe_allow_html=True)
 vista_simplificada = st.checkbox("📱 Ativar vista simplificada (ideal em ecrãs menores)", key="chk_vista_simplificada")
 
 st.write("Total com todos os componentes, taxas e impostos e Valores unitários sem IVA")
+
+st.markdown("➡️ [**Exportar Tabela para Excel**](#exportar-excel-ancora)")
 
 # Verifica se "O Meu Tarifário" deve ser incluído
 final_results_list = resultados_list.copy() # Começa com os tarifários fixos e/ou indexados
@@ -2479,15 +2752,15 @@ if not df_resultados.empty:
         #CORES PARA TARIFÁRIOS INDEXADOS:
         cor_fundo_indexado_media_css = "#FFE699"
         cor_texto_indexado_media_css = "black"
-        cor_fundo_indexado_dinamico_css = "#F8CBAD"  
-        cor_texto_indexado_dinamico_css = "black"
+        cor_fundo_indexado_dinamico_css = "#4D79BC"  
+        cor_texto_indexado_dinamico_css = "white"
 
         cell_style_nome_tarifario_js = JsCode(f"""
         function(params) {{
             // Estilo base aplicado a todas as células desta coluna
             let styleToApply = {{ 
                 textAlign: 'center',
-                borderRadius: '8px',  // O teu borderRadius desejado
+                borderRadius: '6px',  // O teu borderRadius desejado
                 padding: '10px 10px'   // O teu padding desejado
                 // Podes adicionar um backgroundColor default para células não especiais aqui, se quiseres
                 // backgroundColor: '#f0f0f0' // Exemplo para tarifários fixos
@@ -2572,7 +2845,7 @@ if not df_resultados.empty:
                     this.eGui.style.color = 'black';           // Cor do texto
                     this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
                     this.eGui.style.padding = '10px';           // Mais padding
-                    this.eGui.style.borderRadius = '8px';      // Cantos arredondados
+                    this.eGui.style.borderRadius = '6px';      // Cantos arredondados
                     this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
                     this.eGui.style.maxWidth = '400px';        // Largura máxima
                     this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
@@ -2618,7 +2891,7 @@ if not df_resultados.empty:
 
             let style = {{ 
                 textAlign: 'center',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 padding: '10px 10px'
             }};
 
@@ -3173,7 +3446,7 @@ if not df_resultados.empty:
                     filterParams=set_filter_params,
                     cellStyle={
                         'textAlign': 'center', 
-                        'borderRadius': '8px',
+                        'borderRadius': '6px',
                         'padding': '10px 10px',
                         'backgroundColor': '#f0f0f0' 
                     },
@@ -3192,7 +3465,7 @@ if not df_resultados.empty:
                 filter='agTextColumnFilter',
                 cellStyle={
                     'textAlign': 'center', 
-                    'borderRadius': '8px', 
+                    'borderRadius': '6px', 
                     'padding': '10px 10px', 
                     'backgroundColor': '#f0f0f0'
                 },
@@ -3381,6 +3654,7 @@ if not df_resultados.empty:
         )
         # ---- FIM DA CONFIGURAÇÃO DO AGGRID ----
 
+    st.markdown("<a id='exportar-excel-ancora'></a>", unsafe_allow_html=True)
     st.markdown("---")
     with st.expander("📥 Exportar Tabela para Excel"):
         colunas_dados_tooltip_a_ocultar = [
@@ -3619,7 +3893,7 @@ if not df_resultados.empty:
                     itens_legenda_excel = [
                         {"cf": "FF0000", "ct": "FFFFFF", "b": True, "tA": "O Meu Tarifário", "tB": "Tarifário configurado pelo utilizador."},
                         {"cf": "FFE699", "ct": "000000", "b": False, "tA": "Indexado (Média)", "tB": "Preço de energia baseado na média OMIE do período."},
-                        {"cf": "F8CBAD", "ct": "000000", "b": False, "tA": "Indexado (Quarto-Horário)", "tB": "Preço de energia baseado nos valores OMIE horários/quarto-horários e perfil."},
+                        {"cf": "4D79BC", "ct": "FFFFFF", "b": False, "tA": "Indexado (Quarto-Horário)", "tB": "Preço de energia baseado nos valores OMIE horários/quarto-horários e perfil."},
                         {"cf": "F0F0F0", "ct": "333333", "b": False, "tA": "Fixo", "tB": "Preços de energia constantes", "borda_cor": "CCCCCC"}
                     ]
                     
@@ -3645,9 +3919,9 @@ if not df_resultados.empty:
                         
                         celula_B_legenda = worksheet_excel.cell(row=linha_legenda_item_atual, column=2, value=item["tB"])
                         celula_B_legenda.alignment = Alignment(vertical='center', wrap_text=True, horizontal='left')
-                        # Mesclar colunas B até E (ou ajuste conforme a largura desejada para a descrição)
+                        # Mesclar colunas B até D (ou ajuste conforme a largura desejada para a descrição)
                         worksheet_excel.merge_cells(start_row=linha_legenda_item_atual, start_column=2,
-                                                    end_row=linha_legenda_item_atual, end_column=5) 
+                                                    end_row=linha_legenda_item_atual, end_column=4) 
                         
                         worksheet_excel.row_dimensions[linha_legenda_item_atual].height = 20 # Ajustar altura da linha da legenda
                         linha_legenda_item_atual += 1
@@ -3912,7 +4186,7 @@ if not df_resultados.empty:
     cor_fundo_meu_tarifario_legenda = "red"
     cor_texto_meu_tarifario_legenda = "white"
 
-    cor_fundo_fixo_legenda = "#F0F0F0"
+    cor_fundo_fixo_legenda = "#FFFFFF"
     cor_texto_fixo_legenda = "#333333"
     borda_fixo_legenda = "#CCCCCC"     # Borda para o quadrado branco ser visível
 
