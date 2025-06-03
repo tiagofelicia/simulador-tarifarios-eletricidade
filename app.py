@@ -2010,7 +2010,7 @@ if comparar_indexados:
                             elif nome_tarifario == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 1.03) + constantes.get('Repsol_Q_Tarifa_Pro', 0.01359))
                             elif nome_tarifario == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil = (omie + constantes.get('Galp_Ci', 0.0159)) * perdas
                             elif nome_tarifario == "Alfa Energia - ALFA POWER INDEX BTN": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Alfa_CGS', 0.0)) * perdas + constantes.get('Alfa_K', 0.0))
-                            elif nome_tarifario == "Plenitude - Tendência - Há oferta 'Cheque Amazon' 30 € c/ 'link Amigo'": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0)) * perdas + constantes.get('Plenitude_Fee', 0.0))
+                            elif nome_tarifario == "Plenitude - Tendência - Há Cashback 30 €": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0)) * perdas + constantes.get('Plenitude_Fee', 0.0))
                             elif nome_tarifario == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil = (omie + constantes.get('Meo_K', 0.0)) * perdas
                             elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
                             elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
@@ -2048,7 +2048,7 @@ if comparar_indexados:
                             preco_energia_fora_vazio_indexado = preco_simples_repsol
                             preco_energia_cheias_indexado = preco_simples_repsol
                             preco_energia_ponta_indexado = preco_simples_repsol
-                        if nome_tarifario == "Repsol - Leve PRO Sem Mais":
+                        elif nome_tarifario == "Repsol - Leve PRO Sem Mais":
                             # Repsol usa sempre o preço calculado como se fosse Simples
                             preco_simples_repsol_pro = round(soma_calculo_simples / soma_perfil_simples, prec) if soma_perfil_simples > 0 else 0.0
                             preco_energia_simples_indexado = preco_simples_repsol_pro
