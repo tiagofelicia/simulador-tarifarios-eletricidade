@@ -78,6 +78,72 @@ def obter_tar_energia_periodo(opcao_horaria_str, periodo_str, potencia_kva, cons
         return obter_constante(nome_constante, constantes_df)
     return 0.0
 
+# --- Função para REINICIAR o simulador para os valores padrão ---
+def reiniciar_simulador():
+    """
+    Repõe explicitamente todos os valores de session_state para os seus defaults.
+    Este método é mais robusto do que um simples .clear().
+    """
+    
+    # 1. Repor os inputs principais
+    potencias_validas = [1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7, 27.6, 34.5, 41.4]
+    st.session_state.sel_potencia = 3.45  # Default da potência
+    st.session_state.sel_opcao_horaria = "Simples" # Default da opção horária
+    
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    mes_atual_idx = datetime.datetime.now().month - 1
+    st.session_state.sel_mes = meses[mes_atual_idx] # Default do mês
+    
+    # Apagar as chaves das datas para que elas se recalculem com base no mês
+    for key in ['data_inicio_val', 'data_fim_val', 'dias_manual_val']:
+        if key in st.session_state:
+            del st.session_state[key]
+
+    # 2. Repor os inputs de consumo para os valores padrão
+    st.session_state.exp_consumo_s = "158"
+    st.session_state.exp_consumo_v = "63"
+    st.session_state.exp_consumo_f = "95"
+    st.session_state.exp_consumo_c = "68"
+    st.session_state.exp_consumo_p = "27"
+    
+    # 3. Repor os inputs OMIE (apagar para que usem os defaults calculados)
+    for key in ['omie_s_input_field', 'omie_v_input_field', 'omie_f_input_field', 'omie_c_input_field', 'omie_p_input_field', 'omie_foi_editado_manualmente']:
+        if key in st.session_state:
+            del st.session_state[key]
+
+    # 4. Repor as checkboxes de opções adicionais
+    st.session_state.chk_tarifa_social = False
+    st.session_state.chk_tarifa_social_val = False
+    st.session_state.chk_familia_numerosa = False
+    st.session_state.chk_familia_numerosa_val = False
+    st.session_state.chk_acp = True
+    st.session_state.incluir_quota_acp_val = True
+    st.session_state.chk_continente = True
+    st.session_state.desconto_continente_val = True
+    st.session_state.chk_modo_comparacao_opcoes = False
+
+    # 5. Repor o Meu Tarifário
+    st.session_state.chk_meu_tarifario_ativo = False
+    if 'meu_tarifario_calculado' in st.session_state:
+        del st.session_state['meu_tarifario_calculado']
+    
+    chaves_meu_tarifario_reset = [
+        "energia_meu_s_input_val", "potencia_meu_input_val", "energia_meu_v_input_val",
+        "energia_meu_f_input_val", "energia_meu_c_input_val", "energia_meu_p_input_val",
+        "meu_tar_energia_val", "meu_tar_potencia_val", "meu_fin_tse_incluido_val",
+        "meu_desconto_energia_val", "meu_desconto_potencia_val", "meu_desconto_fatura_val",
+        "meu_acrescimo_fatura_val"
+    ]
+    for key in chaves_meu_tarifario_reset:
+        if key in st.session_state:
+            del st.session_state[key]
+            
+    # 6. Repor os filtros da tabela
+    st.session_state.filter_segmento_selectbox = "Residencial"
+    st.session_state.filter_tipos_multi = []
+    st.session_state.filter_faturacao_selectbox = "Todas"
+    st.session_state.filter_pagamento_selectbox = "Todos"
+
 # --- Função: Obter valor da TAR potência para a potência contratada ---
 def obter_tar_dia(potencia_kva, constantes_df):
     potencia_str = str(float(potencia_kva)) # Formato consistente
@@ -324,12 +390,25 @@ def calcular_taxas_adicionais(
 
 # --- Inicializar lista de resultados ---
 resultados_list = []
-col1, col2 = st.columns([1, 5])  # Ajuste as proporções conforme necessário
-with col1:
+
+# --- Título e Botão de Limpeza Geral (Layout Revisto) ---
+
+# Linha 1: Logo e Título
+col_logo, col_titulo = st.columns([1, 5])
+
+with col_logo:
     st.image("https://raw.githubusercontent.com/tiagofelicia/simulador-tarifarios-eletricidade/refs/heads/main/Logo_Tiago_Felicia.png", width=180)
-with col2:
+
+with col_titulo:
     st.title("🔌 Tiago Felícia - Simulador de Tarifários de Eletricidade")
 
+# Linha 2: Botão de limpeza a ocupar a largura total
+st.button(
+    "🧹 Limpar e Reiniciar Simulador", 
+    on_click=reiniciar_simulador,
+    help="Repõe todos os campos do simulador para os valores iniciais.", 
+    use_container_width=True
+)
 
 # --- Inputs principais ---
 # ... (Potência, Opção Horária, Mês) ...
@@ -512,6 +591,45 @@ else:
     st.warning("Não existem dados OMIE para o período selecionado. As médias OMIE serão zero.")
 
 
+# --- Calcular OMIEs médios para TODOS OS CICLOS POSSÍVEIS ---
+omie_medios_calculados_para_todos_ciclos = {'S': 0.0} # Inicializar com Simples
+
+if not df_omie_no_periodo_selecionado.empty and 'OMIE' in df_omie_no_periodo_selecionado.columns:
+    omie_medios_calculados_para_todos_ciclos['S'] = df_omie_no_periodo_selecionado['OMIE'].mean()
+    if pd.isna(omie_medios_calculados_para_todos_ciclos['S']):
+        omie_medios_calculados_para_todos_ciclos['S'] = 0.0
+
+    ciclos_a_processar = {
+        'BD': ['V', 'F'], 'BS': ['V', 'F'],
+        'TD': ['V', 'C', 'P'], 'TS': ['V', 'C', 'P']
+    }
+    for ciclo_curto, periodos_ciclo in ciclos_a_processar.items():
+        if ciclo_curto in df_omie_no_periodo_selecionado.columns:
+            omie_ciclo_calculado = df_omie_no_periodo_selecionado.groupby(ciclo_curto)['OMIE'].mean()
+            for p_ciclo in periodos_ciclo:
+                chave_completa = f"{ciclo_curto}_{p_ciclo}"
+                omie_medios_calculados_para_todos_ciclos[chave_completa] = omie_ciclo_calculado.get(p_ciclo, 0.0)
+                if pd.isna(omie_medios_calculados_para_todos_ciclos[chave_completa]):
+                     omie_medios_calculados_para_todos_ciclos[chave_completa] = 0.0
+        else: # Fallback se a coluna do ciclo não existir
+            for p_ciclo in periodos_ciclo:
+                chave_completa = f"{ciclo_curto}_{p_ciclo}"
+                omie_medios_calculados_para_todos_ciclos[chave_completa] = omie_medios_calculados_para_todos_ciclos['S'] # Usa OMIE Simples como fallback
+
+
+# Garantir que todas as chaves esperadas existem, mesmo que com valor de OMIE Simples como fallback
+chaves_omie_esperadas = ['S']
+for ciclo_key_esperado in ['BD', 'BS']:
+    for periodo_key_esperado in ['V', 'F']:
+        chaves_omie_esperadas.append(f"{ciclo_key_esperado}_{periodo_key_esperado}")
+for ciclo_key_esperado in ['TD', 'TS']:
+    for periodo_key_esperado in ['V', 'C', 'P']:
+        chaves_omie_esperadas.append(f"{ciclo_key_esperado}_{periodo_key_esperado}")
+
+for k_omie_calc in chaves_omie_esperadas:
+    if k_omie_calc not in omie_medios_calculados_para_todos_ciclos:
+        omie_medios_calculados_para_todos_ciclos[k_omie_calc] = omie_medios_calculados_para_todos_ciclos.get('S', 0.0) # Default para OMIE Simples
+
 # --- Inputs Manuais OMIE pelo utilizador e Deteção de Edição ---
 st.session_state.omie_foi_editado_manualmente = st.session_state.get('omie_foi_editado_manualmente', {})
 omie_medios_calculados = {'S': 0.0, 'V': 0.0, 'F': 0.0, 'C': 0.0, 'P': 0.0} # Recalcular aqui com base em df_omie_no_periodo_selecionado
@@ -535,55 +653,119 @@ else:
 
 # ... Lógica para Simples para inputs OMIE e flags de edição ...
 if opcao_horaria.lower() == "simples":
-    default_s = round(omie_medios_calculados['S'], 2)
-    label_s_completo = f"Valor OMIE (€/MWh) - Simples{nota_omie}"    
-    omie_s_manual = st.number_input(label_s_completo, value=st.session_state.get('omie_s_input_field', default_s), step=0.01, key="omie_s_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
-    st.session_state.omie_s_input_field = omie_s_manual
-    if round(omie_s_manual, 2) != default_s: st.session_state.omie_foi_editado_manualmente['S'] = True
-    elif 'S' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['S'] = False
-# ... Resto da lógica para Bi e Tri-horário para inputs OMIE e flags de edição ...
+    default_s = st.session_state.get('omie_s_input_field', round(omie_medios_calculados['S'], 2))
+    label_s_completo = f"Valor OMIE (€/MWh) - Simples{nota_omie}"
+    
+    omie_s_manual = st.number_input(
+        label_s_completo, 
+        value=default_s, 
+        step=1.0, 
+        format="%.2f", # <-- Mostra sempre 2 casas decimais
+        key="omie_s_input", 
+        help="A primeira alteração arredonda para o inteiro mais próximo. As seguintes incrementam de 1 em 1."
+    )
+    
+    # --- LÓGICA PERSONALIZADA DE ARREDONDAMENTO ---
+    valor_anterior_s = st.session_state.get('omie_s_input_field', round(omie_medios_calculados['S'], 2))
+    
+    if omie_s_manual != valor_anterior_s: # Se o utilizador interagiu com o widget
+        # E se for a PRIMEIRA vez que é editado
+        if not st.session_state.omie_foi_editado_manualmente.get('S', False):
+            valor_arredondado = float(round(omie_s_manual))
+            st.session_state.omie_s_input_field = valor_arredondado
+            st.session_state.omie_foi_editado_manualmente['S'] = True
+            st.rerun() # Força a atualização do widget para o valor arredondado
+        else: # Se já foi editado antes, apenas atualiza o valor
+            st.session_state.omie_s_input_field = omie_s_manual
+    else:
+        # Se não houve interação, apenas garante que o valor está guardado
+        st.session_state.omie_s_input_field = omie_s_manual
+
+
 elif opcao_horaria.lower().startswith("bi"):
     col_omie1, col_omie2 = st.columns(2)
-    default_v = round(omie_medios_calculados['V'], 2)
-    default_f = round(omie_medios_calculados['F'], 2)
     with col_omie1:
+        default_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados['V'], 2))
         label_v_completo = f"Valor OMIE (€/MWh) - Vazio{nota_omie}"
-        omie_v_manual = st.number_input(label_v_completo, value=st.session_state.get('omie_v_input_field', default_v), step=0.01, key="omie_v_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
-        st.session_state.omie_v_input_field = omie_v_manual
-        if round(omie_v_manual, 2) != default_v: st.session_state.omie_foi_editado_manualmente['V'] = True
-        elif 'V' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['V'] = False
+        omie_v_manual = st.number_input(label_v_completo, value=default_v, step=1.0, format="%.2f", key="omie_v_input", help="A primeira alteração arredonda para o inteiro mais próximo.")
+        
+        valor_anterior_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados['V'], 2))
+        if omie_v_manual != valor_anterior_v:
+            if not st.session_state.omie_foi_editado_manualmente.get('V', False):
+                st.session_state.omie_v_input_field = float(round(omie_v_manual))
+                st.session_state.omie_foi_editado_manualmente['V'] = True
+                st.rerun()
+            else:
+                st.session_state.omie_v_input_field = omie_v_manual
+        else:
+            st.session_state.omie_v_input_field = omie_v_manual
 
     with col_omie2:
+        default_f = st.session_state.get('omie_f_input_field', round(omie_medios_calculados['F'], 2))
         label_f_completo = f"Valor OMIE (€/MWh) - Fora Vazio{nota_omie}"
-        omie_f_manual = st.number_input(label_f_completo, value=st.session_state.get('omie_f_input_field', default_f), step=0.01, key="omie_f_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
-        st.session_state.omie_f_input_field = omie_f_manual
-        if round(omie_f_manual, 2) != default_f: st.session_state.omie_foi_editado_manualmente['F'] = True
-        elif 'F' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['F'] = False
+        omie_f_manual = st.number_input(label_f_completo, value=default_f, step=1.0, format="%.2f", key="omie_f_input", help="A primeira alteração arredonda para o inteiro mais próximo.")
+
+        valor_anterior_f = st.session_state.get('omie_f_input_field', round(omie_medios_calculados['F'], 2))
+        if omie_f_manual != valor_anterior_f:
+            if not st.session_state.omie_foi_editado_manualmente.get('F', False):
+                st.session_state.omie_f_input_field = float(round(omie_f_manual))
+                st.session_state.omie_foi_editado_manualmente['F'] = True
+                st.rerun()
+            else:
+                st.session_state.omie_f_input_field = omie_f_manual
+        else:
+            st.session_state.omie_f_input_field = omie_f_manual
 
 
 elif opcao_horaria.lower().startswith("tri"):
     col_omie1, col_omie2, col_omie3 = st.columns(3)
-    default_v = round(omie_medios_calculados['V'], 2)
-    default_c = round(omie_medios_calculados['C'], 2)
-    default_p = round(omie_medios_calculados['P'], 2)
     with col_omie1:
+        default_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados['V'], 2))
         label_v_completo = f"Valor OMIE (€/MWh) - Vazio{nota_omie}"
-        omie_v_manual = st.number_input(label_v_completo, value=st.session_state.get('omie_v_input_field', default_v), step=0.01, key="omie_v_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
-        st.session_state.omie_v_input_field = omie_v_manual
-        if round(omie_v_manual, 2) != default_v: st.session_state.omie_foi_editado_manualmente['V'] = True
-        elif 'V' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['V'] = False
+        omie_v_manual = st.number_input(label_v_completo, value=default_v, step=1.0, format="%.2f", key="omie_v_input", help="A primeira alteração arredonda para o inteiro mais próximo.")
+        
+        valor_anterior_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados['V'], 2))
+        if omie_v_manual != valor_anterior_v:
+            if not st.session_state.omie_foi_editado_manualmente.get('V', False):
+                st.session_state.omie_v_input_field = float(round(omie_v_manual))
+                st.session_state.omie_foi_editado_manualmente['V'] = True
+                st.rerun()
+            else:
+                st.session_state.omie_v_input_field = omie_v_manual
+        else:
+            st.session_state.omie_v_input_field = omie_v_manual
+            
     with col_omie2:
+        default_c = st.session_state.get('omie_c_input_field', round(omie_medios_calculados['C'], 2))
         label_c_completo = f"Valor OMIE (€/MWh) - Cheias{nota_omie}"
-        omie_c_manual = st.number_input(label_c_completo, value=st.session_state.get('omie_c_input_field', default_c), step=0.01, key="omie_c_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
-        st.session_state.omie_c_input_field = omie_c_manual
-        if round(omie_c_manual, 2) != default_c: st.session_state.omie_foi_editado_manualmente['C'] = True
-        elif 'C' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['C'] = False
+        omie_c_manual = st.number_input(label_c_completo, value=default_c, step=1.0, format="%.2f", key="omie_c_input", help="A primeira alteração arredonda para o inteiro mais próximo.")
+        
+        valor_anterior_c = st.session_state.get('omie_c_input_field', round(omie_medios_calculados['C'], 2))
+        if omie_c_manual != valor_anterior_c:
+            if not st.session_state.omie_foi_editado_manualmente.get('C', False):
+                st.session_state.omie_c_input_field = float(round(omie_c_manual))
+                st.session_state.omie_foi_editado_manualmente['C'] = True
+                st.rerun()
+            else:
+                st.session_state.omie_c_input_field = omie_c_manual
+        else:
+            st.session_state.omie_c_input_field = omie_c_manual
+
     with col_omie3:
+        default_p = st.session_state.get('omie_p_input_field', round(omie_medios_calculados['P'], 2))
         label_p_completo = f"Valor OMIE (€/MWh) - Ponta{nota_omie}"
-        omie_p_manual = st.number_input(label_p_completo, value=st.session_state.get('omie_p_input_field', default_p), step=0.01, key="omie_p_input", help="Apenas para Tarifários Indexados. O valor automático é calculado pelos valores OMIE das datas. Pode editar para simular outros valores.")
-        st.session_state.omie_p_input_field = omie_p_manual
-        if round(omie_p_manual, 2) != default_p: st.session_state.omie_foi_editado_manualmente['P'] = True
-        elif 'P' not in st.session_state.omie_foi_editado_manualmente : st.session_state.omie_foi_editado_manualmente['P'] = False
+        omie_p_manual = st.number_input(label_p_completo, value=default_p, step=1.0, format="%.2f", key="omie_p_input", help="A primeira alteração arredonda para o inteiro mais próximo.")
+        
+        valor_anterior_p = st.session_state.get('omie_p_input_field', round(omie_medios_calculados['P'], 2))
+        if omie_p_manual != valor_anterior_p:
+            if not st.session_state.omie_foi_editado_manualmente.get('P', False):
+                st.session_state.omie_p_input_field = float(round(omie_p_manual))
+                st.session_state.omie_foi_editado_manualmente['P'] = True
+                st.rerun()
+            else:
+                st.session_state.omie_p_input_field = omie_p_manual
+        else:
+            st.session_state.omie_p_input_field = omie_p_manual
 
 # --- Alerta para uso de OMIE Manual ---
 alertas_omie_manual = []
@@ -661,60 +843,89 @@ elif opcao_horaria.lower().startswith("tri"):
     omie_para_tarifarios_media['C'] = st.session_state.get('omie_c_input_field', omie_medios_calculados['C'])
     omie_para_tarifarios_media['P'] = st.session_state.get('omie_p_input_field', omie_medios_calculados['P'])
 
-# --- Calcular Perdas médias por tipo de ciclo e período ---
+# --- Calcular Perdas médias para TODOS os ciclos e períodos (GLOBALMENTE) ---
 perdas_medias = {}
-if not df_omie_no_periodo_selecionado.empty and 'Perdas' in df_omie_no_periodo_selecionado.columns: # Usa o DF original para perdas médias
-    # Para o intervalo selecionado
-    if opcao_horaria.lower() == "simples":
-        perdas_medias['Perdas_M_S'] = df_omie_no_periodo_selecionado['Perdas'].mean()
-    elif opcao_horaria.lower().startswith("bi"):
-        ciclo_col = "BD" if "Diário" in opcao_horaria else "BS"
-        if ciclo_col in df_omie_no_periodo_selecionado.columns:
-            perdas_bi = df_omie_no_periodo_selecionado.groupby(ciclo_col)['Perdas'].mean()
-            perdas_medias[f'Perdas_M_{ciclo_col}_V'] = perdas_bi.get('V', 1.0)
-            perdas_medias[f'Perdas_M_{ciclo_col}_F'] = perdas_bi.get('F', 1.0)
-        else: # Fallback se coluna de ciclo não existir
-            perdas_medias[f'Perdas_M_{ciclo_col}_V'] = df_omie_no_periodo_selecionado['Perdas'].mean()
-            perdas_medias[f'Perdas_M_{ciclo_col}_F'] = df_omie_no_periodo_selecionado['Perdas'].mean()
+if not df_omie_no_periodo_selecionado.empty and 'Perdas' in df_omie_no_periodo_selecionado.columns:
+    # Médias para o período selecionado
+    perdas_medias['Perdas_M_S'] = df_omie_no_periodo_selecionado['Perdas'].mean()
+    
+    for ciclo_base_curto in ['BD', 'BS']: # Bi-Diário, Bi-Semanal
+        if ciclo_base_curto in df_omie_no_periodo_selecionado.columns:
+            perdas_ciclo_periodo = df_omie_no_periodo_selecionado.groupby(ciclo_base_curto)['Perdas'].mean()
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_V'] = perdas_ciclo_periodo.get('V', 1.0)
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_F'] = perdas_ciclo_periodo.get('F', 1.0)
+        else: # Fallback se coluna de ciclo não existir para o período selecionado
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_V'] = perdas_medias['Perdas_M_S'] # Usa média simples como fallback
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_F'] = perdas_medias['Perdas_M_S']
 
-    elif opcao_horaria.lower().startswith("tri"):
-        ciclo_col = "TD" if "Diário" in opcao_horaria else "TS"
-        if ciclo_col in df_omie_no_periodo_selecionado.columns:
-            perdas_tri = df_omie_no_periodo_selecionado.groupby(ciclo_col)['Perdas'].mean()
-            perdas_medias[f'Perdas_M_{ciclo_col}_V'] = perdas_tri.get('V', 1.0)
-            perdas_medias[f'Perdas_M_{ciclo_col}_C'] = perdas_tri.get('C', 1.0)
-            perdas_medias[f'Perdas_M_{ciclo_col}_P'] = perdas_tri.get('P', 1.0)
+    for ciclo_base_curto in ['TD', 'TS']: # Tri-Diário, Tri-Semanal
+        if ciclo_base_curto in df_omie_no_periodo_selecionado.columns:
+            perdas_ciclo_periodo = df_omie_no_periodo_selecionado.groupby(ciclo_base_curto)['Perdas'].mean()
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_V'] = perdas_ciclo_periodo.get('V', 1.0)
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_C'] = perdas_ciclo_periodo.get('C', 1.0)
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_P'] = perdas_ciclo_periodo.get('P', 1.0)
         else: # Fallback
-            perdas_medias[f'Perdas_M_{ciclo_col}_V'] = df_omie_no_periodo_selecionado['Perdas'].mean()
-            perdas_medias[f'Perdas_M_{ciclo_col}_C'] = df_omie_no_periodo_selecionado['Perdas'].mean()
-            perdas_medias[f'Perdas_M_{ciclo_col}_P'] = df_omie_no_periodo_selecionado['Perdas'].mean()
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_V'] = perdas_medias['Perdas_M_S']
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_C'] = perdas_medias['Perdas_M_S']
+            perdas_medias[f'Perdas_M_{ciclo_base_curto}_P'] = perdas_medias['Perdas_M_S']
 
-    # Para o ano completo (usado por alguns tarifários de média para perdas)
-    df_omie_ano_completo = OMIE_PERDAS_CICLOS[OMIE_PERDAS_CICLOS['DataHora'].dt.year == ano_atual].copy()
-    if not df_omie_ano_completo.empty and 'Perdas' in df_omie_ano_completo.columns:
-        if opcao_horaria.lower() == "simples":
-            perdas_medias['Perdas_Anual_S'] = df_omie_ano_completo['Perdas'].mean()
-        elif opcao_horaria.lower().startswith("bi"):
-            ciclo_col_anual = "BD" if "Diário" in opcao_horaria else "BS"
-            if ciclo_col_anual in df_omie_ano_completo.columns:
-                perdas_bi_anual = df_omie_ano_completo.groupby(ciclo_col_anual)['Perdas'].mean()
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_V'] = perdas_bi_anual.get('V', 1.0)
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_F'] = perdas_bi_anual.get('F', 1.0)
-            else: # Fallback
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_V'] = df_omie_ano_completo['Perdas'].mean()
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_F'] = df_omie_ano_completo['Perdas'].mean()
+    # Médias para o ano completo
+    df_omie_ano_completo_pm = OMIE_PERDAS_CICLOS[OMIE_PERDAS_CICLOS['DataHora'].dt.year == ano_atual].copy() # Renomeado df_omie_ano_completo
+    if not df_omie_ano_completo_pm.empty and 'Perdas' in df_omie_ano_completo_pm.columns:
+        perdas_medias['Perdas_Anual_S'] = df_omie_ano_completo_pm['Perdas'].mean()
 
-        elif opcao_horaria.lower().startswith("tri"):
-            ciclo_col_anual = "TD" if "Diário" in opcao_horaria else "TS"
-            if ciclo_col_anual in df_omie_ano_completo.columns:
-                perdas_tri_anual = df_omie_ano_completo.groupby(ciclo_col_anual)['Perdas'].mean()
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_V'] = perdas_tri_anual.get('V', 1.0)
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_C'] = perdas_tri_anual.get('C', 1.0)
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_P'] = perdas_tri_anual.get('P', 1.0)
+        for ciclo_base_curto_anual in ['BD', 'BS']:
+            if ciclo_base_curto_anual in df_omie_ano_completo_pm.columns:
+                perdas_ciclo_anual = df_omie_ano_completo_pm.groupby(ciclo_base_curto_anual)['Perdas'].mean()
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_V'] = perdas_ciclo_anual.get('V', 1.0)
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_F'] = perdas_ciclo_anual.get('F', 1.0)
             else: # Fallback
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_V'] = df_omie_ano_completo['Perdas'].mean()
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_C'] = df_omie_ano_completo['Perdas'].mean()
-                perdas_medias[f'Perdas_Anual_{ciclo_col_anual}_P'] = df_omie_ano_completo['Perdas'].mean()
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_V'] = perdas_medias.get('Perdas_Anual_S', 1.0)
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_F'] = perdas_medias.get('Perdas_Anual_S', 1.0)
+
+        for ciclo_base_curto_anual in ['TD', 'TS']:
+            if ciclo_base_curto_anual in df_omie_ano_completo_pm.columns:
+                perdas_ciclo_anual = df_omie_ano_completo_pm.groupby(ciclo_base_curto_anual)['Perdas'].mean()
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_V'] = perdas_ciclo_anual.get('V', 1.0)
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_C'] = perdas_ciclo_anual.get('C', 1.0)
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_P'] = perdas_ciclo_anual.get('P', 1.0)
+            else: # Fallback
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_V'] = perdas_medias.get('Perdas_Anual_S', 1.0)
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_C'] = perdas_medias.get('Perdas_Anual_S', 1.0)
+                perdas_medias[f'Perdas_Anual_{ciclo_base_curto_anual}_P'] = perdas_medias.get('Perdas_Anual_S', 1.0)
+    else:
+        st.warning("Não existem dados OMIE para o ano completo. Algumas médias de perdas anuais podem não ser calculadas.")
+else:
+    st.warning("Não existem dados OMIE ou coluna 'Perdas' para o período selecionado. As médias de perdas podem não ser calculadas corretamente.")
+# Garantir que todas as chaves esperadas existem em perdas_medias, mesmo que com default 1.0
+chaves_perdas_esperadas = [
+    'Perdas_M_S', 'Perdas_Anual_S',
+    'Perdas_M_BD_V', 'Perdas_Anual_BD_V', 'Perdas_M_BD_F', 'Perdas_Anual_BD_F',
+    'Perdas_M_BS_V', 'Perdas_Anual_BS_V', 'Perdas_M_BS_F', 'Perdas_Anual_BS_F',
+    'Perdas_M_TD_V', 'Perdas_Anual_TD_V', 'Perdas_M_TD_C', 'Perdas_Anual_TD_C', 'Perdas_M_TD_P', 'Perdas_Anual_TD_P',
+    'Perdas_M_TS_V', 'Perdas_Anual_TS_V', 'Perdas_M_TS_C', 'Perdas_Anual_TS_C', 'Perdas_M_TS_P', 'Perdas_Anual_TS_P',
+]
+for k_perda in chaves_perdas_esperadas:
+    if k_perda not in perdas_medias:
+        perdas_medias[k_perda] = 1.0 # Default para perdas
+
+# --- FUNÇÃO AUXILIAR PARA OPÇÕES DE FILTRO ---
+def get_filter_options_for_multiselect(df_fixos, df_indexados, column_name):
+    options = []
+    if df_fixos is not None and column_name in df_fixos.columns:
+        options.extend(df_fixos[column_name].astype(str).str.strip().dropna().unique())
+    if df_indexados is not None and column_name in df_indexados.columns:
+        options.extend(df_indexados[column_name].astype(str).str.strip().dropna().unique())
+    
+    if column_name == 'Tipo':
+        options.append("Pessoal")
+    if column_name == 'Segmento': # Se o seu "Meu Tarifário" tiver um segmento específico
+        options.append("Pessoal") # Adapte conforme necessário ou remova se não aplicável
+        
+    unique_options_intermediate = set(opt for opt in options if opt and opt.lower() != 'nan')
+    
+    return sorted(list(unique_options_intermediate))
+# --- FIM FUNÇÃO AUXILIAR PARA OPÇÕES DE FILTRO ---
 
 # --- Consumos ---
 st.subheader("⚡ Consumos")
@@ -1011,21 +1222,866 @@ with st.expander("Opções Adicionais de Simulação (Tarifa Social e condiciona
             st.session_state['desconto_continente_val'] = desconto_continente
     # else: as variáveis incluir_quota_acp e desconto_continente já foram inicializadas com os valores do session_state ou default
 
-    st.markdown("##### Comparação Tarifários Indexados")
-    comparar_indexados = st.checkbox(
-        "Incluir na comparação Tarifários Indexados ao Mercado Spot",
-        value=True,
-        key='comparar_indexados',
-        help="Inclui as ofertas com mecanismos de indexação de preços ao mercado diário de energia (OMIE)"
-    )
+    # O título mantém-se para organização visual
+    #st.markdown("##### Comparação Tarifários Indexados")
+    # A variável é agora fixada como True, removendo a checkbox da interface
+    comparar_indexados = True
+
 # --- Fim do st.expander "Opções Adicionais de Simulação" ---
 
 # Checkbox para ativar "O Meu Tarifário"
+help_O_Meu_Tarifario = """
+Para preencher os valores de acordo com o seu tarifário, ou com outro qualquer que queira comparar.
+
+**Atenção às notas sobre as TAR e TSE.**
+    """
 meu_tarifario_ativo = st.checkbox(
-    "Comparar com O Meu Tarifário?",
+    "**Comparar com O Meu Tarifário?**",
     key="chk_meu_tarifario_ativo",
-    help="Para preencher os valores de acordo com o seu tarifário, ou com outro qualquer que queira comparar. Atenção às notas sobre as TAR e TSE"
+    help=help_O_Meu_Tarifario
 )
+
+
+# Criação de todos_omie_inputs_utilizador_comp
+todos_omie_inputs_utilizador_comp = {
+    'S': st.session_state.get('omie_s_input_field', round(omie_medios_calculados.get('S',0), 2)),
+    'V': st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2)),
+    'F': st.session_state.get('omie_f_input_field', round(omie_medios_calculados.get('F',0), 2)),
+    'C': st.session_state.get('omie_c_input_field', round(omie_medios_calculados.get('C',0), 2)),
+    'P': st.session_state.get('omie_p_input_field', round(omie_medios_calculados.get('P',0), 2))
+}
+# omie_medio_simples_real_kwh já é calculado globalmente (linha 619) e pode ser passado como está
+# perdas_medias já é calculado globalmente (linhas 637-678) e pode ser passado como está
+
+
+
+#DETERMINAÇÃO DE OPÇÕES HORÁRIAS
+def determinar_opcoes_horarias_destino_e_ordenacao(
+    opcao_horaria_principal_str,
+    potencia_kva_num,
+    consumos_input_atuais_dict, # NOVO PARÂMETRO
+    opcoes_horarias_existentes_lista # NOVO PARÂMETRO (passar a lista global)
+):
+    oh_principal_lower = opcao_horaria_principal_str.lower()
+    destino_cols_nomes_unicos = []
+    coluna_ordenacao_inicial_aggrid = None
+
+    # Nomes EXATOS como na sua BD (Excel)
+    SIMPLES_DB = "Simples"
+    BI_DIARIO_DB = "Bi-horário - Ciclo Diário"
+    BI_SEMANAL_DB = "Bi-horário - Ciclo Semanal"
+    TRI_DIARIO_DB = "Tri-horário - Ciclo Diário"
+    TRI_SEMANAL_DB = "Tri-horário - Ciclo Semanal"
+    TRI_DIARIO_ALTA_DB = "Tri-horário > 20.7 kVA - Ciclo Diário"
+    TRI_SEMANAL_ALTA_DB = "Tri-horário > 20.7 kVA - Ciclo Semanal"
+
+    tem_consumo_simples_valido = float(consumos_input_atuais_dict.get('S', 0)) > 0
+    tem_consumo_bi_valido = float(consumos_input_atuais_dict.get('V', 0)) > 0 and \
+                              float(consumos_input_atuais_dict.get('F', 0)) > 0
+    tem_consumo_tri_valido = float(consumos_input_atuais_dict.get('V', 0)) > 0 and \
+                               float(consumos_input_atuais_dict.get('C', 0)) > 0 and \
+                               float(consumos_input_atuais_dict.get('P', 0)) > 0
+
+    # Lógica baseada na potência primeiro
+    if potencia_kva_num > 20.7:
+        # Para potências altas, esperamos apenas Tri-Horário se houver consumos Tri válidos
+        if tem_consumo_tri_valido:
+            if TRI_DIARIO_ALTA_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(TRI_DIARIO_ALTA_DB)
+            if TRI_SEMANAL_ALTA_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(TRI_SEMANAL_ALTA_DB)
+        # Se não há consumo Tri válido, ou nenhuma opção Tri de alta potência existe,
+        # a lista ficará vazia, o que é correto, pois não há o que comparar.
+
+    else: # Potência <= 20.7 kVA
+        # Adicionar Simples se for a opção principal com consumo, ou se puder ser derivada de Bi/Tri
+        if (oh_principal_lower == "simples" and tem_consumo_simples_valido) or \
+           (oh_principal_lower.startswith("bi") and tem_consumo_bi_valido) or \
+           (oh_principal_lower.startswith("tri") and tem_consumo_tri_valido):
+            if SIMPLES_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(SIMPLES_DB)
+
+        # Adicionar Bi-Horário se a principal for Bi com consumo, ou Tri com consumo
+        if (oh_principal_lower.startswith("bi") and tem_consumo_bi_valido) or \
+           (oh_principal_lower.startswith("tri") and tem_consumo_tri_valido):
+            if BI_DIARIO_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(BI_DIARIO_DB)
+            if BI_SEMANAL_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(BI_SEMANAL_DB)
+
+        # Adicionar Tri-Horário apenas se a principal for Tri com consumo
+        if oh_principal_lower.startswith("tri") and tem_consumo_tri_valido and not oh_principal_lower.startswith("tri-horário > 20.7 kva"):
+            if TRI_DIARIO_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(TRI_DIARIO_DB)
+            if TRI_SEMANAL_DB in opcoes_horarias_existentes_lista:
+                destino_cols_nomes_unicos.append(TRI_SEMANAL_DB)
+
+    # Ordenar as opções de destino encontradas
+    ordem_preferencial = {
+        SIMPLES_DB: 0, BI_DIARIO_DB: 1, BI_SEMANAL_DB: 2,
+        TRI_DIARIO_DB: 3, TRI_SEMANAL_DB: 4,
+        TRI_DIARIO_ALTA_DB: 5, TRI_SEMANAL_ALTA_DB: 6
+    }
+    destino_cols_nomes_unicos = sorted(
+        list(set(destino_cols_nomes_unicos)), # Remove duplicados
+        key=lambda x: ordem_preferencial.get(x, 99)
+    )
+
+    # Definir coluna de ordenação inicial
+    # Tenta usar a opção horária principal do utilizador, se ela for um dos destinos válidos.
+    # Caso contrário, usa a primeira opção da lista de destinos (já ordenada).
+    if opcao_horaria_principal_str in destino_cols_nomes_unicos:
+        coluna_ordenacao_inicial_aggrid = f"Total {opcao_horaria_principal_str} (€)"
+    elif destino_cols_nomes_unicos:
+        coluna_ordenacao_inicial_aggrid = f"Total {destino_cols_nomes_unicos[0]} (€)"
+
+    colunas_aggrid_destino_formatadas = [f"Total {op_h} (€)" for op_h in destino_cols_nomes_unicos]
+    return destino_cols_nomes_unicos, colunas_aggrid_destino_formatadas, coluna_ordenacao_inicial_aggrid
+
+#Função Tarifário Fixo para comparação
+def calcular_detalhes_custo_tarifario_fixo(
+    dados_tarifario_linha,        # Uma Series do Pandas representando a linha do tarifário
+    opcao_horaria_para_calculo, 
+    consumos_repartidos_dict,   
+    potencia_contratada_kva,
+    dias_calculo,
+    tarifa_social_ativa,
+    familia_numerosa_ativa,
+    valor_dgeg_user_input,
+    valor_cav_user_input,
+    incluir_quota_acp_input,
+    desconto_continente_input,
+    CONSTANTES_df,
+    dias_no_mes_selecionado_dict, 
+    mes_selecionado_pelo_user_str, # Já está a receber o mês
+    ano_atual_calculo,             # Já está a receber o ano
+    data_inicio_periodo_obj, 
+    data_fim_periodo_obj
+):
+    """
+    Calcula o custo total e os componentes de tooltip para um DADO TARIFÁRIO FIXO,
+    para uma DADA OPÇÃO HORÁRIA DE DESTINO e DADOS CONSUMOS REPARTIDOS.
+    Retorna um dicionário com 'Total (€)', 'NomeParaExibirAjustado' e os dicts de tooltip,
+    ou None se o cálculo não for aplicável (ex: tarifário não tem preços para a opção).
+    """
+    try:
+        # Extrair nome do comercializador de dados_tarifario_linha
+        nome_comercializador_para_taxas = str(dados_tarifario_linha.get('comercializador', 'Desconhecido'))
+        nome_tarifario_original = str(dados_tarifario_linha['nome'])
+        nome_a_exibir_final = nome_tarifario_original # Começa com o nome original
+
+        # --- Obter Preços e Flags do Tarifário para a OPÇÃO HORÁRIA DE CÁLCULO ---
+        # Esta parte é crucial: os preços devem ser os corretos para a 'opcao_horaria_para_calculo'
+        preco_energia_input_tf = {}
+        oh_calc_lower = opcao_horaria_para_calculo.lower()
+
+        if oh_calc_lower == "simples":
+            preco_s = dados_tarifario_linha.get('preco_energia_simples')
+            if pd.notna(preco_s):
+                preco_energia_input_tf['S'] = float(preco_s)
+            else:
+                print(f"DEBUG CALC: {nome_tarifario_original} ({opcao_horaria_para_calculo}) - Preço Simples em falta.") # DEBUG
+                return None 
+        elif oh_calc_lower.startswith("bi-horário"):
+            preco_v_bi = dados_tarifario_linha.get('preco_energia_vazio_bi')
+            preco_f_bi = dados_tarifario_linha.get('preco_energia_fora_vazio')
+            if pd.notna(preco_v_bi) and pd.notna(preco_f_bi):
+                preco_energia_input_tf['V'] = float(preco_v_bi)
+                preco_energia_input_tf['F'] = float(preco_f_bi)
+            else:
+                print(f"DEBUG CALC: {nome_tarifario_original} ({opcao_horaria_para_calculo}) - Preços Bi-Horário em falta/inválidos (Vazio: {preco_v_bi}, ForaVazio: {preco_f_bi}).") # DEBUG
+                return None 
+        elif oh_calc_lower.startswith("tri-horário"): # Cobre variantes normais e >20.7kVA
+            if pd.notna(dados_tarifario_linha.get('preco_energia_vazio_tri')) and \
+               pd.notna(dados_tarifario_linha.get('preco_energia_cheias')) and \
+               pd.notna(dados_tarifario_linha.get('preco_energia_ponta')):
+                preco_energia_input_tf['V'] = float(dados_tarifario_linha.get('preco_energia_vazio_tri', 0.0))
+                preco_energia_input_tf['C'] = float(dados_tarifario_linha.get('preco_energia_cheias', 0.0))
+                preco_energia_input_tf['P'] = float(dados_tarifario_linha.get('preco_energia_ponta', 0.0))
+            else: # Tarifário não tem oferta Tri-Horário completa
+                return None
+        else:
+            return None # Opção horária de cálculo desconhecida
+
+        preco_potencia_input_tf = float(dados_tarifario_linha.get('preco_potencia_dia', 0.0))
+        tar_incluida_energia_tf = dados_tarifario_linha.get('tar_incluida_energia', True)
+        tar_incluida_potencia_tf = dados_tarifario_linha.get('tar_incluida_potencia', True)
+        financiamento_tse_incluido_tf = dados_tarifario_linha.get('financiamento_tse_incluido', True)
+
+        # --- Passo 1: Identificar Componentes Base (Sem IVA, Sem TS) ---
+        tar_energia_regulada_tf = {}
+        for periodo_consumo_key in consumos_repartidos_dict.keys(): # S, V, F, C, P
+            tar_energia_regulada_tf[periodo_consumo_key] = obter_tar_energia_periodo(
+                opcao_horaria_para_calculo, periodo_consumo_key, potencia_contratada_kva, CONSTANTES_df
+            )
+
+        tar_potencia_regulada_tf = obter_tar_dia(potencia_contratada_kva, CONSTANTES_df)
+
+        preco_comercializador_energia_tf = {}
+        for periodo_preco_key, preco_val_tf in preco_energia_input_tf.items():
+            if periodo_preco_key not in consumos_repartidos_dict: continue # Só se houver consumo nesse período
+            if tar_incluida_energia_tf:
+                preco_comercializador_energia_tf[periodo_preco_key] = preco_val_tf - tar_energia_regulada_tf.get(periodo_preco_key, 0.0)
+            else:
+                preco_comercializador_energia_tf[periodo_preco_key] = preco_val_tf
+        
+        if tar_incluida_potencia_tf:
+            preco_comercializador_potencia_tf = preco_potencia_input_tf - tar_potencia_regulada_tf
+        else:
+            preco_comercializador_potencia_tf = preco_potencia_input_tf
+        preco_comercializador_potencia_tf = max(0.0, preco_comercializador_potencia_tf)
+
+        financiamento_tse_a_adicionar_tf = FINANCIAMENTO_TSE_VAL if not financiamento_tse_incluido_tf else 0.0
+
+        # --- Passo 2: Calcular Componentes TAR Finais (Com Desconto TS, Sem IVA) ---
+        tar_energia_final_tf = {}
+        tar_potencia_final_dia_tf = tar_potencia_regulada_tf
+        desconto_ts_energia_aplicado_val = 0.0
+        desconto_ts_potencia_aplicado_val = 0.0
+
+        if tarifa_social_ativa:
+            desconto_ts_energia_bruto = obter_constante('Desconto TS Energia', CONSTANTES_df)
+            desconto_ts_potencia_dia_bruto = obter_constante(f'Desconto TS Potencia {potencia_contratada_kva}', CONSTANTES_df)
+            for periodo_calc, tar_reg_val in tar_energia_regulada_tf.items():
+                tar_energia_final_tf[periodo_calc] = max(0.0, tar_reg_val - desconto_ts_energia_bruto)
+            desconto_ts_energia_aplicado_val = desconto_ts_energia_bruto # Para tooltip
+            
+            tar_potencia_final_dia_tf = max(0.0, tar_potencia_regulada_tf - desconto_ts_potencia_dia_bruto)
+            desconto_ts_potencia_aplicado_val = min(tar_potencia_regulada_tf, desconto_ts_potencia_dia_bruto) # Para tooltip
+        else:
+            tar_energia_final_tf = tar_energia_regulada_tf.copy()
+
+        # --- Passo 3: Calcular Preço Final Energia (€/kWh, Sem IVA) ---
+        preco_energia_final_sem_iva_tf_dict = {}
+        for periodo_calc in consumos_repartidos_dict.keys(): # Iterar sobre os períodos COM CONSUMO
+            if periodo_calc in preco_comercializador_energia_tf: # Verificar se há preço definido para este período
+                preco_energia_final_sem_iva_tf_dict[periodo_calc] = (
+                    preco_comercializador_energia_tf.get(periodo_calc, 0.0) +
+                    tar_energia_final_tf.get(periodo_calc, 0.0) +
+                    financiamento_tse_a_adicionar_tf
+                )
+
+        # --- Passo 4: Calcular Componentes Finais Potência (€/dia, Sem IVA) ---
+        preco_comercializador_potencia_final_sem_iva_tf = preco_comercializador_potencia_tf
+
+        # --- Passo 5 & 6: Calcular Custo Total Energia e Potência (Com IVA) ---
+        consumo_total_neste_oh = sum(float(v or 0) for v in consumos_repartidos_dict.values())
+
+        decomposicao_custo_energia_tf = calcular_custo_energia_com_iva(
+            consumo_total_neste_oh,
+            preco_energia_final_sem_iva_tf_dict.get('S') if opcao_horaria_para_calculo.lower() == "simples" else None,
+            {p: v for p, v in preco_energia_final_sem_iva_tf_dict.items() if p != 'S'},
+            dias_calculo, potencia_contratada_kva, opcao_horaria_para_calculo,
+            consumos_repartidos_dict, # Usar os consumos repartidos para esta opção horária
+            familia_numerosa_ativa
+        )
+        
+        decomposicao_custo_potencia_tf_calc = calcular_custo_potencia_com_iva_final(
+            preco_comercializador_potencia_final_sem_iva_tf,
+            tar_potencia_final_dia_tf,  # <--- USE DIRETAMENTE A VARIÁVEL CORRETA
+            dias_calculo, potencia_contratada_kva
+        )
+
+        # --- Passo 7: Calcular Taxas Adicionais ---
+        decomposicao_taxas_tf = calcular_taxas_adicionais(
+            consumo_total_neste_oh, dias_calculo, tarifa_social_ativa,
+            valor_dgeg_user_input, valor_cav_user_input,
+            nome_comercializador_para_taxas,     # <--- PASSAR O NOME DO COMERCIALIZADOR
+            mes_selecionado_pelo_user_str,       # <--- PASSAR O MÊS
+            ano_atual_calculo,                   # <--- PASSAR O ANO
+            valor_iec=0.001 # O default já está na função
+        )
+
+
+        # --- Passo 8: Calcular Custo Total Final e aplicar descontos específicos ---
+        custo_total_antes_desc_fatura_tf = (
+            decomposicao_custo_energia_tf['custo_com_iva'] +
+            decomposicao_custo_potencia_tf_calc['custo_com_iva'] +
+            decomposicao_taxas_tf['custo_com_iva']
+        )
+
+        # Lógica de mês completo para descontos mensais
+        e_mes_completo_selecionado_calc = False
+        if dias_calculo == dias_no_mes_selecionado_dict.get(mes_selecionado_pelo_user_str, 0):
+            e_mes_completo_selecionado_calc = True
+        
+        # Desconto de fatura do Excel
+        desconto_fatura_mensal_excel = float(dados_tarifario_linha.get('desconto_fatura_mes', 0.0) or 0.0)
+        desconto_fatura_periodo_aplicado = 0.0
+        if desconto_fatura_mensal_excel > 0:
+            nome_a_exibir_final += f" (+desc. fat. {desconto_fatura_mensal_excel:.2f}€/mês)"
+            desconto_fatura_periodo_aplicado = (desconto_fatura_mensal_excel / 30.0) * dias_calculo if not e_mes_completo_selecionado_calc else desconto_fatura_mensal_excel
+        
+        custo_apos_desc_fatura_excel = custo_total_antes_desc_fatura_tf - desconto_fatura_periodo_aplicado
+        
+        # Quota ACP
+        custo_apos_acp = custo_apos_desc_fatura_excel
+        quota_acp_periodo_aplicada = 0.0
+        if incluir_quota_acp_input and nome_tarifario_original.startswith("Goldenergy - ACP"):
+            quota_acp_a_aplicar = (VALOR_QUOTA_ACP_MENSAL / 30.0) * dias_calculo if not e_mes_completo_selecionado_calc else VALOR_QUOTA_ACP_MENSAL
+            custo_apos_acp += quota_acp_a_aplicar
+            nome_a_exibir_final += f" (INCLUI Quota ACP - {VALOR_QUOTA_ACP_MENSAL:.2f} €/mês)"
+            quota_acp_periodo_aplicada = quota_acp_a_aplicar
+
+        # Desconto MEO
+        custo_antes_desconto_meo = custo_apos_acp
+        desconto_meo_periodo_aplicado = 0.0
+        if "meo energia - tarifa fixa - clientes meo" in nome_tarifario_original.lower() and \
+           (consumo_total_neste_oh / dias_calculo * 30.0 if dias_calculo > 0 else 0) >= 216:
+            desconto_meo_mensal_base = 0.0
+            if opcao_horaria_para_calculo.lower() == "simples": desconto_meo_mensal_base = 2.95
+            elif opcao_horaria_para_calculo.lower().startswith("bi-horário"): desconto_meo_mensal_base = 3.50
+            elif opcao_horaria_para_calculo.lower().startswith("tri-horário"): desconto_meo_mensal_base = 6.27
+            if desconto_meo_mensal_base > 0 and dias_calculo > 0:
+                desconto_meo_periodo_aplicado = (desconto_meo_mensal_base / 30.0) * dias_calculo
+                custo_antes_desconto_meo -= desconto_meo_periodo_aplicado
+                nome_a_exibir_final += f" (Desc. MEO {desconto_meo_periodo_aplicado:.2f}€ incl.)"
+        
+        # Desconto Continente
+        custo_base_para_continente = custo_antes_desconto_meo
+        custo_total_final = custo_base_para_continente # Custo final por defeito
+        valor_X_desconto_continente_aplicado = 0.0
+        if desconto_continente_input and nome_tarifario_original.startswith("Galp & Continente"):
+            valor_X_desconto_continente_aplicado = (decomposicao_custo_energia_tf['custo_com_iva'] + decomposicao_custo_potencia_tf_calc['custo_com_iva']) * 0.10
+            custo_total_final -= valor_X_desconto_continente_aplicado
+            nome_a_exibir_final += f" (INCLUI desc. Cont. de {valor_X_desconto_continente_aplicado:.2f}€, s/ desc. Cont.={custo_base_para_continente:.2f}€)"
+        
+        # --- Construir Dicionários de Tooltip ---
+        # Tooltip Energia
+        componentes_tooltip_energia_dict = {}
+        for p_key_tt_energia in preco_energia_final_sem_iva_tf_dict.keys():
+            componentes_tooltip_energia_dict[f'tooltip_energia_{p_key_tt_energia}_comerc_sem_tar'] = preco_comercializador_energia_tf.get(p_key_tt_energia, 0.0)
+            componentes_tooltip_energia_dict[f'tooltip_energia_{p_key_tt_energia}_tar_bruta'] = tar_energia_regulada_tf.get(p_key_tt_energia, 0.0)
+            componentes_tooltip_energia_dict[f'tooltip_energia_{p_key_tt_energia}_tse_declarado_incluido'] = financiamento_tse_incluido_tf
+            componentes_tooltip_energia_dict[f'tooltip_energia_{p_key_tt_energia}_tse_valor_nominal'] = FINANCIAMENTO_TSE_VAL
+            componentes_tooltip_energia_dict[f'tooltip_energia_{p_key_tt_energia}_ts_aplicada_flag'] = tarifa_social_ativa
+            componentes_tooltip_energia_dict[f'tooltip_energia_{p_key_tt_energia}_ts_desconto_valor'] = obter_constante('Desconto TS Energia', CONSTANTES_df) if tarifa_social_ativa else 0.0
+        
+        # Tooltip Potência
+        componentes_tooltip_potencia_dict = {
+            'tooltip_pot_comerc_sem_tar': preco_comercializador_potencia_tf, # Já após desconto %, mas antes de TS
+            'tooltip_pot_tar_bruta': tar_potencia_regulada_tf,
+            'tooltip_pot_ts_aplicada': tarifa_social_ativa,
+            'tooltip_pot_desconto_ts_valor': desconto_ts_potencia_aplicado_val # Valor efetivo do desconto TS na TAR
+        }
+
+        # Preço unitário da potência s/IVA (comercializador + TAR final)
+        preco_unit_potencia_siva_tf = preco_comercializador_potencia_final_sem_iva_tf + tar_potencia_final_dia_tf # Esta é a soma correta
+
+        # Tooltip Custo Total
+        componentes_tooltip_total_dict = {
+            'tt_cte_energia_siva': decomposicao_custo_energia_tf['custo_sem_iva'],
+            'tt_cte_potencia_siva': decomposicao_custo_potencia_tf_calc['custo_sem_iva'],
+            'tt_cte_iec_siva': decomposicao_taxas_tf['iec_sem_iva'],
+            'tt_cte_dgeg_siva': decomposicao_taxas_tf['dgeg_sem_iva'],
+            'tt_cte_cav_siva': decomposicao_taxas_tf['cav_sem_iva'],
+            'tt_cte_total_siva': decomposicao_custo_energia_tf['custo_sem_iva'] + decomposicao_custo_potencia_tf_calc['custo_sem_iva'] + decomposicao_taxas_tf['custo_sem_iva'],
+            'tt_cte_valor_iva_6_total': decomposicao_custo_energia_tf['valor_iva_6'] + decomposicao_custo_potencia_tf_calc['valor_iva_6'] + decomposicao_taxas_tf['valor_iva_6'],
+            'tt_cte_valor_iva_23_total': decomposicao_custo_energia_tf['valor_iva_23'] + decomposicao_custo_potencia_tf_calc['valor_iva_23'] + decomposicao_taxas_tf['valor_iva_23'],
+            'tt_cte_subtotal_civa': custo_total_antes_desc_fatura_tf,
+            'tt_cte_desc_finais_valor': desconto_fatura_periodo_aplicado + desconto_meo_periodo_aplicado + valor_X_desconto_continente_aplicado,
+            'tt_cte_acres_finais_valor': quota_acp_periodo_aplicada,
+            **{f"tt_preco_unit_energia_{p}_siva": v for p, v in preco_energia_final_sem_iva_tf_dict.items()},
+            'tt_preco_unit_potencia_siva': preco_unit_potencia_siva_tf
+        }
+        
+        return {
+            'Total (€)': custo_total_final,
+            'NomeParaExibirAjustado': nome_a_exibir_final, 
+            'componentes_tooltip_custo_total_dict': componentes_tooltip_total_dict,
+            'componentes_tooltip_energia_dict': componentes_tooltip_energia_dict,
+            'componentes_tooltip_potencia_dict': componentes_tooltip_potencia_dict
+        }
+    
+    except Exception as e:
+        st.error(f"Erro ao calcular custo para {dados_tarifario_linha.get('nome', 'Tarifário Desconhecido')} na opção {opcao_horaria_para_calculo}: {e}")
+        return None
+
+
+#Função Tarifário Indexado para comparação
+def calcular_detalhes_custo_tarifario_indexado(
+    dados_tarifario_indexado_linha,
+    opcao_horaria_para_calculo, # A opção de destino (Simples, Bi, Tri) - ex: "Bi-horário - Ciclo Diário"
+    opcao_horaria_principal_global, # NOVO PARÂMETRO: A opção principal selecionada pelo user (st.selectbox)
+    consumos_repartidos_dict,
+    potencia_contratada_kva,
+    dias_calculo,
+    tarifa_social_ativa,
+    familia_numerosa_ativa,
+    valor_dgeg_user_input,
+    valor_cav_user_input,
+    CONSTANTES_df,
+    df_omie_ajustado_para_calculo,
+    perdas_medias_dict_global,
+    todos_omie_inputs_user_global, # Valores dos st.number_input OMIE (S,V,F,C,P)
+    omie_medios_calculados_para_todos_ciclos_global, # NOVO: OMIEs médios CALCULADOS para todos os ciclos
+    omie_medio_simples_real_kwh_para_luzigas_idx,
+    dias_no_mes_selecionado_dict,
+    mes_selecionado_pelo_user_str,
+    ano_atual_calculo,
+    data_inicio_periodo_obj,
+    data_fim_periodo_obj
+):
+    try:
+        nome_tarifario_original = str(dados_tarifario_indexado_linha['nome'])
+        tipo_tarifario_original = str(dados_tarifario_indexado_linha['tipo'])
+        formula_energia_str = str(dados_tarifario_indexado_linha.get('formula_calculo', ''))
+        nome_a_exibir_final = nome_tarifario_original
+
+        precos_energia_base_kwh_nesta_oh = {} # Preços base calculados para a opcao_horaria_para_calculo
+        oh_calc_lower = opcao_horaria_para_calculo.lower() # ex: "simples", "bi-horário - ciclo diário"
+        constantes_dict_local = dict(zip(CONSTANTES_df["constante"], CONSTANTES_df["valor_unitário"]))
+        
+        # Valores para os preços de energia indexada (resultados do cálculo abaixo)
+        preco_idx_s, preco_idx_v, preco_idx_f, preco_idx_c, preco_idx_p = None, None, None, None, None
+
+        # --- BLOCO 1: Cálculo para Indexados Quarto-Horários (BTN ou Luzboa "BTN SPOTDEF") ---
+        if 'BTN' in formula_energia_str or nome_tarifario_original == "Luzboa - BTN SPOTDEF":
+            soma_calculo_periodo = {p_key: 0.0 for p_key in ['S', 'V', 'F', 'C', 'P']} # Acumuladores para todos os períodos possíveis
+            soma_perfil_periodo = {p_key: 0.0 for p_key in ['S', 'V', 'F', 'C', 'P']}
+
+            # Determinar coluna de ciclo e perfil com base na opcao_horaria_para_calculo
+            # Nota: opcao_horaria_para_calculo é o nome DB, ex: "Bi-horário - Ciclo Diário"
+            coluna_ciclo_qh = None
+            if oh_calc_lower.startswith("bi-horário"):
+                coluna_ciclo_qh = 'BD' if "diário" in oh_calc_lower else 'BS'
+            elif oh_calc_lower.startswith("tri-horário") and not oh_calc_lower.startswith("tri-horário > 20.7 kva"):
+                coluna_ciclo_qh = 'TD' if "diário" in oh_calc_lower else 'TS'
+            elif oh_calc_lower.startswith("tri-horário > 20.7 kva"):
+                 coluna_ciclo_qh = 'TD' if "diário" in oh_calc_lower else 'TS' # Mesma lógica de ciclo
+
+            consumo_total_para_perfil_nesta_oh = sum(v for v in consumos_repartidos_dict.values() if v is not None)
+            perfil_nome_str = obter_perfil(consumo_total_para_perfil_nesta_oh, dias_calculo, potencia_contratada_kva) # perfil_A, perfil_B, perfil_C
+            perfil_coluna_qh = f"BTN_{perfil_nome_str.split('_')[1].upper()}" # BTN_A, BTN_B, BTN_C
+
+            if perfil_coluna_qh not in df_omie_ajustado_para_calculo.columns:
+                # st.warning(f"DEBUG COMP: Coluna de perfil '{perfil_coluna_qh}' não encontrada para '{nome_tarifario_original}' em '{opcao_horaria_para_calculo}'. Energia será zero.")
+                # Definir preços como zero se o perfil não existir no DF OMIE
+                for p_key_cons in consumos_repartidos_dict.keys(): precos_energia_base_kwh_nesta_oh[p_key_cons] = 0.0
+            
+            elif nome_tarifario_original == "Luzboa - BTN SPOTDEF":
+                # Lógica específica Luzboa (usa médias horárias simples, não ponderadas por perfil BTN)
+                soma_luzboa_p = {k: 0.0 for k in ['S', 'V', 'F', 'C', 'P']}
+                count_luzboa_p = {k: 0 for k in ['S', 'V', 'F', 'C', 'P']}
+
+                for _, row_omie in df_omie_ajustado_para_calculo.iterrows():
+                    if not all(k_luzboa in row_omie and pd.notna(row_omie[k_luzboa]) for k_luzboa in ['OMIE', 'Perdas']): continue
+                    omie_val_l = row_omie['OMIE'] / 1000.0
+                    perdas_val_l = row_omie['Perdas']
+                    cgs_luzboa = constantes_dict_local.get('Luzboa_CGS', 0.0)
+                    fa_luzboa = constantes_dict_local.get('Luzboa_FA', 1.0)
+                    kp_luzboa = constantes_dict_local.get('Luzboa_Kp', 0.0)
+                    valor_hora_luzboa = (omie_val_l + cgs_luzboa) * perdas_val_l * fa_luzboa + kp_luzboa
+
+                    soma_luzboa_p['S'] += valor_hora_luzboa; count_luzboa_p['S'] += 1
+                    
+                    if coluna_ciclo_qh and coluna_ciclo_qh in row_omie and pd.notna(row_omie[coluna_ciclo_qh]):
+                        ciclo_hora_l = row_omie[coluna_ciclo_qh] # V, F, C, P
+                        if ciclo_hora_l in soma_luzboa_p: # Para V,F,C,P
+                             soma_luzboa_p[ciclo_hora_l] += valor_hora_luzboa
+                             count_luzboa_p[ciclo_hora_l] += 1
+                
+                prec_luzboa = 4
+                if oh_calc_lower == "simples":
+                    preco_idx_s = round(soma_luzboa_p['S'] / count_luzboa_p['S'], prec_luzboa) if count_luzboa_p['S'] > 0 else 0.0
+                elif oh_calc_lower.startswith("bi-horário"):
+                    preco_idx_v = round(soma_luzboa_p['V'] / count_luzboa_p['V'], prec_luzboa) if count_luzboa_p['V'] > 0 else 0.0
+                    preco_idx_f = round(soma_luzboa_p['F'] / count_luzboa_p['F'], prec_luzboa) if count_luzboa_p['F'] > 0 else 0.0
+                elif oh_calc_lower.startswith("tri-horário"):
+                    preco_idx_v = round(soma_luzboa_p['V'] / count_luzboa_p['V'], prec_luzboa) if count_luzboa_p['V'] > 0 else 0.0
+                    preco_idx_c = round(soma_luzboa_p['C'] / count_luzboa_p['C'], prec_luzboa) if count_luzboa_p['C'] > 0 else 0.0
+                    preco_idx_p = round(soma_luzboa_p['P'] / count_luzboa_p['P'], prec_luzboa) if count_luzboa_p['P'] > 0 else 0.0
+
+            else: # Outros Tarifários Quarto-Horários (Coopernico, Repsol, Galp, etc.)
+                # Precisam da coluna de ciclo para V,F,C,P
+                cycle_column_ok_qh = True
+                if oh_calc_lower != "simples":
+                    if not coluna_ciclo_qh or coluna_ciclo_qh not in df_omie_ajustado_para_calculo.columns:
+                        # st.warning(f"DEBUG COMP: Coluna ciclo '{coluna_ciclo_qh}' em falta para '{nome_tarifario_original}' em '{opcao_horaria_para_calculo}'. Preços V/F/C/P serão 0.")
+                        cycle_column_ok_qh = False
+                        # Se a coluna de ciclo não existe, os preços para V,F,C,P serão zero, Simples ainda pode ser calculado.
+                        preco_idx_v, preco_idx_f, preco_idx_c, preco_idx_p = 0.0, 0.0, 0.0, 0.0
+
+                for _, row_omie in df_omie_ajustado_para_calculo.iterrows():
+                    required_cols_qh = ['OMIE', 'Perdas', perfil_coluna_qh]
+                    if not all(k_qh in row_omie and pd.notna(row_omie[k_qh]) for k_qh in required_cols_qh): continue
+                    
+                    omie_val_qh = row_omie['OMIE'] / 1000.0
+                    perdas_val_qh = row_omie['Perdas']
+                    perfil_val_qh = row_omie[perfil_coluna_qh]
+                    if perfil_val_qh <= 0: continue
+
+                    calculo_instantaneo_sem_perfil_qh = 0.0
+                    # --- Fórmulas específicas BTN (Quarto-Horário) ---
+                    if nome_tarifario_original == "Coopérnico Base 2.0": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Coop_CS_CR', 0.0) + constantes_dict_local.get('Coop_K', 0.0)) * perdas_val_qh
+                    elif nome_tarifario_original == "Repsol - Leve Sem Mais": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('Repsol_FA', 0.0) + constantes_dict_local.get('Repsol_Q_Tarifa', 0.0))
+                    elif nome_tarifario_original == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('Repsol_FA', 0.0) + constantes_dict_local.get('Repsol_Q_Tarifa_Pro', 0.0))
+                    elif nome_tarifario_original == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Galp_Ci', 0.0)) * perdas_val_qh
+                    elif nome_tarifario_original == "Alfa Energia - ALFA POWER INDEX BTN": calculo_instantaneo_sem_perfil_qh = ((omie_val_qh + constantes_dict_local.get('Alfa_CGS', 0.0)) * perdas_val_qh + constantes_dict_local.get('Alfa_K', 0.0))
+                    elif nome_tarifario_original == "Plenitude - Tendência - Há Cashback 30 €": calculo_instantaneo_sem_perfil_qh = ((omie_val_qh + constantes_dict_local.get('Plenitude_CGS', 0.0) + constantes_dict_local.get('Plenitude_GDOs', 0.0)) * perdas_val_qh + constantes_dict_local.get('Plenitude_Fee', 0.0))
+                    elif nome_tarifario_original == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Meo_K', 0.0)) * perdas_val_qh
+                    elif nome_tarifario_original == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('EDP_H_K1', 1.0) + constantes_dict_local.get('EDP_H_K2', 0.0))
+                    elif nome_tarifario_original == "EZU - Coletiva": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('EZU_K', 0.0) + constantes_dict_local.get('EZU_CGS', 0.0)) * perdas_val_qh
+                    elif nome_tarifario_original == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * constantes_dict_local.get('G9_FA', 0.0) * perdas_val_qh + constantes_dict_local.get('G9_CGS', 0.0) + constantes_dict_local.get('G9_AC', 0.0))
+                    elif nome_tarifario_original == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh + constantes_dict_local.get("Iberdrola_Q", 0.0) + constantes_dict_local.get('Iberdrola_mFRR', 0.0))
+                    else: calculo_instantaneo_sem_perfil_qh = omie_val_qh * perdas_val_qh # Fallback
+
+                    soma_calculo_periodo['S'] += calculo_instantaneo_sem_perfil_qh * perfil_val_qh
+                    soma_perfil_periodo['S'] += perfil_val_qh
+                    
+                    if cycle_column_ok_qh and coluna_ciclo_qh and coluna_ciclo_qh in row_omie and pd.notna(row_omie[coluna_ciclo_qh]):
+                        ciclo_hora_qh = row_omie[coluna_ciclo_qh] # V, F, C, P
+                        if ciclo_hora_qh in soma_calculo_periodo: # Para V,F,C,P
+                             soma_calculo_periodo[ciclo_hora_qh] += calculo_instantaneo_sem_perfil_qh * perfil_val_qh
+                             soma_perfil_periodo[ciclo_hora_qh] += perfil_val_qh
+                
+                prec_qh = 4 # Aumentar precisão interna para cálculos
+                # Calcular preços médios ponderados para cada período da opcao_horaria_para_calculo
+                if nome_tarifario_original in ["Repsol - Leve Sem Mais", "Repsol - Leve PRO Sem Mais"]:
+                    # Repsol usa sempre o preço calculado como se fosse Simples para todos os períodos
+                    preco_simples_calc_repsol = round(soma_calculo_periodo['S'] / soma_perfil_periodo['S'], prec_qh) if soma_perfil_periodo['S'] > 0 else 0.0
+                    preco_idx_s = preco_simples_calc_repsol
+                    preco_idx_v = preco_simples_calc_repsol
+                    preco_idx_f = preco_simples_calc_repsol
+                    preco_idx_c = preco_simples_calc_repsol
+                    preco_idx_p = preco_simples_calc_repsol
+                else: # Outros BTN
+                    if oh_calc_lower == "simples":
+                        preco_idx_s = round(soma_calculo_periodo['S'] / soma_perfil_periodo['S'], prec_qh) if soma_perfil_periodo['S'] > 0 else 0.0
+                    elif oh_calc_lower.startswith("bi-horário"):
+                        preco_idx_v = round(soma_calculo_periodo['V'] / soma_perfil_periodo['V'], prec_qh) if soma_perfil_periodo['V'] > 0 else 0.0
+                        preco_idx_f = round(soma_calculo_periodo['F'] / soma_perfil_periodo['F'], prec_qh) if soma_perfil_periodo['F'] > 0 else 0.0
+                    elif oh_calc_lower.startswith("tri-horário"):
+                        preco_idx_v = round(soma_calculo_periodo['V'] / soma_perfil_periodo['V'], prec_qh) if soma_perfil_periodo['V'] > 0 else 0.0
+                        preco_idx_c = round(soma_calculo_periodo['C'] / soma_perfil_periodo['C'], prec_qh) if soma_perfil_periodo['C'] > 0 else 0.0
+                        preco_idx_p = round(soma_calculo_periodo['P'] / soma_perfil_periodo['P'], prec_qh) if soma_perfil_periodo['P'] > 0 else 0.0
+
+# --- BLOCO 2: Cálculo para Indexados Média ---
+        else: # Tarifários de Média
+            prec_media = 4 # Conforme o seu ficheiro .py
+
+            # Iterar sobre os períodos RELEVANTES para a opcao_horaria_para_calculo (destino)
+            periodos_relevantes_para_destino = []
+            if oh_calc_lower == "simples":
+                periodos_relevantes_para_destino.append('S')
+            elif oh_calc_lower.startswith("bi-horário"):
+                periodos_relevantes_para_destino.extend(['V', 'F'])
+            elif oh_calc_lower.startswith("tri-horário"):
+                periodos_relevantes_para_destino.extend(['V', 'C', 'P'])
+
+            for p_key_destino in periodos_relevantes_para_destino:
+                omie_mwh_final_para_formula = 0.0
+                
+                # Determinar ciclo real da opção de DESTINO (S, BD, BS, TD, TS)
+                ciclo_real_oh_destino = ""
+                if oh_calc_lower == "simples":
+                    ciclo_real_oh_destino = "S"
+                elif oh_calc_lower.startswith("bi-horário"):
+                    ciclo_real_oh_destino = "BD" if "diário" in oh_calc_lower else "BS"
+                elif oh_calc_lower.startswith("tri-horário"): # Cobre >20.7kVA também para ciclo
+                    ciclo_real_oh_destino = "TD" if "diário" in oh_calc_lower else "TS"
+
+                # 1. Obter OMIE MWh base (CALCULADO para o ciclo/período de DESTINO)
+                chave_omie_calculado_destino = ""
+                if ciclo_real_oh_destino == "S":
+                    chave_omie_calculado_destino = "S"
+                elif ciclo_real_oh_destino: # Para BD, BS, TD, TS
+                    chave_omie_calculado_destino = f"{ciclo_real_oh_destino}_{p_key_destino}"
+                
+                omie_mwh_base_calculado = omie_medios_calculados_para_todos_ciclos_global.get(chave_omie_calculado_destino, 0.0)
+
+                # 2. Verificar se OMIE manual da OPÇÃO PRINCIPAL deve sobrepor-se
+                if opcao_horaria_para_calculo == opcao_horaria_principal_global and \
+                   st.session_state.omie_foi_editado_manualmente.get(p_key_destino, False):
+                    # Usar o valor do input manual (que corresponde à opção principal)
+                    omie_mwh_final_para_formula = todos_omie_inputs_user_global.get(p_key_destino, omie_mwh_base_calculado)
+                else:
+                    # Usar o OMIE calculado específico para o ciclo de destino
+                    omie_mwh_final_para_formula = omie_mwh_base_calculado
+                
+                omie_kwh_a_usar_na_formula = omie_mwh_final_para_formula / 1000.0
+                
+                # Lógica de PERDAS (deve usar perdas_medias_dict_global e o ciclo_real_oh_destino)
+                perdas_a_usar_val_media = 1.0 # Default
+                if nome_tarifario_original in ["LUZiGÁS - Energy 8.8", "LUZiGÁS - Dinâmico Poupança +", "Ibelectra - Solução Família"]:
+                    # Perdas Anuais por período da opção de destino
+                    chave_perda_anual = f'Perdas_Anual_{ciclo_real_oh_destino}_{p_key_destino}' if ciclo_real_oh_destino != "S" else 'Perdas_Anual_S'
+                    perdas_a_usar_val_media = perdas_medias_dict_global.get(chave_perda_anual, 1.0)
+                elif nome_tarifario_original == "G9 - Smart Index":
+                    # Perdas do PERÍODO SELECIONADO por período da opção de destino
+                    chave_perda_periodo = f'Perdas_M_{ciclo_real_oh_destino}_{p_key_destino}' if ciclo_real_oh_destino != "S" else 'Perdas_M_S'
+                    perdas_a_usar_val_media = perdas_medias_dict_global.get(chave_perda_periodo, 1.0)
+                # Para outros, a lógica de perdas está nas fórmulas ou são constantes.
+
+                # --- Fórmulas específicas para Tarifários de Média ---
+                temp_preco_calculado = 0.0
+                # OMIE para LuziGás é especial (usa OMIE real simples)
+                omie_para_luzigas_kwh = omie_medio_simples_real_kwh_para_luzigas_idx
+                
+                if nome_tarifario_original == "Iberdrola - Simples Indexado":
+                    if p_key_destino == 'S': temp_preco_calculado = omie_kwh_a_usar_na_formula * constantes_dict_local.get('Iberdrola_Perdas', 1.0) + constantes_dict_local.get("Iberdrola_Q", 0.0) + constantes_dict_local.get('Iberdrola_mFRR', 0.0)
+                elif nome_tarifario_original == "Goldenergy - Tarifário Indexado 100%":
+                    if p_key_destino == 'S':
+                        mes_num_calculo = list(dias_no_mes_selecionado_dict.keys()).index(mes_selecionado_pelo_user_str) + 1
+                        perdas_mensais_ge_map = {1:1.29,2:1.18,3:1.18,4:1.15,5:1.11,6:1.10,7:1.15,8:1.13,9:1.10,10:1.10,11:1.16,12:1.25}
+                        perdas_mensais_ge = perdas_mensais_ge_map.get(mes_num_calculo, 1.0)
+                        temp_preco_calculado = omie_kwh_a_usar_na_formula * perdas_mensais_ge + constantes_dict_local.get('GE_Q_Tarifa', 0.0) + constantes_dict_local.get('GE_CG', 0.0)
+                elif nome_tarifario_original == "Endesa - Tarifa Indexada":
+                    if p_key_destino == 'S': temp_preco_calculado = omie_kwh_a_usar_na_formula + constantes_dict_local.get('Endesa_A_S', 0.0)
+                    elif p_key_destino == 'V': temp_preco_calculado = omie_kwh_a_usar_na_formula + constantes_dict_local.get('Endesa_A_V', 0.0)
+                    elif p_key_destino == 'F': temp_preco_calculado = omie_kwh_a_usar_na_formula + constantes_dict_local.get('Endesa_A_FV', 0.0)
+                elif nome_tarifario_original == "LUZiGÁS - Energy 8.8": # Usa OMIE Real Simples
+                    calc_base_luzigas = omie_para_luzigas_kwh + constantes_dict_local.get('Luzigas_8_8_K', 0.0) + constantes_dict_local.get('Luzigas_CGS', 0.0)
+                    temp_preco_calculado = calc_base_luzigas * perdas_a_usar_val_media
+                elif nome_tarifario_original == "LUZiGÁS - Dinâmico Poupança +": # Usa OMIE Real Simples
+                    calc_base_luzigas = omie_para_luzigas_kwh + constantes_dict_local.get('Luzigas_D_K', 0.0) + constantes_dict_local.get('Luzigas_CGS', 0.0)
+                    temp_preco_calculado = calc_base_luzigas * perdas_a_usar_val_media
+                elif nome_tarifario_original == "Ibelectra - Solução Família": # Usa OMIE do input user p/ período destino
+                    temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * perdas_a_usar_val_media + constantes_dict_local.get('Ibelectra_K', 0.0)
+                elif nome_tarifario_original == "G9 - Smart Index": # Usa OMIE do input user p/ período destino
+                    temp_preco_calculado = (omie_kwh_a_usar_na_formula * constantes_dict_local.get('G9_FA', 1.02) * perdas_a_usar_val_media) + constantes_dict_local.get('G9_CGS', 0.01) + constantes_dict_local.get('G9_AC', 0.0055)
+                elif nome_tarifario_original == "EDP - Eletricidade Indexada Média": # Usa OMIE do input user p/ período destino
+                    temp_preco_calculado = omie_kwh_a_usar_na_formula * constantes_dict_local.get('EDP_M_Perdas', 1.0) * constantes_dict_local.get('EDP_M_K1', 1.0) + constantes_dict_local.get('EDP_M_K2', 0.0)
+                else:
+                    temp_preco_calculado = omie_kwh_a_usar_na_formula # Fallback
+                
+                # Atribuir ao respetivo preço_idx_X
+                if p_key_destino == 'S': preco_idx_s = round(temp_preco_calculado, prec_media)
+                elif p_key_destino == 'V': preco_idx_v = round(temp_preco_calculado, prec_media)
+                elif p_key_destino == 'F': preco_idx_f = round(temp_preco_calculado, prec_media)
+                elif p_key_destino == 'C': preco_idx_c = round(temp_preco_calculado, prec_media)
+                elif p_key_destino == 'P': preco_idx_p = round(temp_preco_calculado, prec_media)
+        
+        # --- FIM DO CÁLCULO BASE DO PREÇO DE ENERGIA INDEXADA ---
+
+        # Apenas para os períodos relevantes para `opcao_horaria_para_calculo` e `consumos_repartidos_dict`
+        if oh_calc_lower == "simples":
+            if 'S' in consumos_repartidos_dict: precos_energia_base_kwh_nesta_oh['S'] = preco_idx_s if preco_idx_s is not None else 0.0
+        elif oh_calc_lower.startswith("bi-horário"):
+            if 'V' in consumos_repartidos_dict: precos_energia_base_kwh_nesta_oh['V'] = preco_idx_v if preco_idx_v is not None else 0.0
+            if 'F' in consumos_repartidos_dict: precos_energia_base_kwh_nesta_oh['F'] = preco_idx_f if preco_idx_f is not None else 0.0
+        elif oh_calc_lower.startswith("tri-horário"):
+            if 'V' in consumos_repartidos_dict: precos_energia_base_kwh_nesta_oh['V'] = preco_idx_v if preco_idx_v is not None else 0.0
+            if 'C' in consumos_repartidos_dict: precos_energia_base_kwh_nesta_oh['C'] = preco_idx_c if preco_idx_c is not None else 0.0
+            if 'P' in consumos_repartidos_dict: precos_energia_base_kwh_nesta_oh['P'] = preco_idx_p if preco_idx_p is not None else 0.0
+
+        preco_potencia_input_idx = float(dados_tarifario_indexado_linha.get('preco_potencia_dia', 0.0))
+        tar_incluida_energia_idx = dados_tarifario_indexado_linha.get('tar_incluida_energia', False)
+        tar_incluida_potencia_idx = dados_tarifario_indexado_linha.get('tar_incluida_potencia', True)
+        financiamento_tse_incluido_idx = dados_tarifario_indexado_linha.get('financiamento_tse_incluido', False)
+
+        # --- Passo 1 Adaptado: Componentes Base ---
+        tar_energia_regulada_idx = {}
+        for periodo_consumo_key in consumos_repartidos_dict.keys():
+            tar_energia_regulada_idx[periodo_consumo_key] = obter_tar_energia_periodo(
+                opcao_horaria_para_calculo, periodo_consumo_key, potencia_contratada_kva, CONSTANTES_df
+            )
+        tar_potencia_regulada_idx = obter_tar_dia(potencia_contratada_kva, CONSTANTES_df)
+
+        # Para indexados, o preco_comercializador_energia é o próprio preço indexado calculado acima
+        # A TAR de energia é adicionada separadamente.
+        preco_comercializador_energia_idx_dict = {} # Renomeado para evitar confusão
+        for periodo_calc_idx, preco_base_idx in precos_energia_base_kwh_nesta_oh.items():
+            if tar_incluida_energia_idx: # Geralmente False para indexados puros
+                preco_comercializador_energia_idx_dict[periodo_calc_idx] = preco_base_idx - tar_energia_regulada_idx.get(periodo_calc_idx, 0.0)
+            else:
+                preco_comercializador_energia_idx_dict[periodo_calc_idx] = preco_base_idx
+        # Não limitar a max(0,...) aqui para componentes de indexados, pois podem ser negativos antes da TAR
+
+        # --- Passo 2 Adaptado: TARs Finais ---
+        if tar_incluida_potencia_idx:
+            preco_comercializador_potencia_idx = preco_potencia_input_idx - tar_potencia_regulada_idx
+        else:
+            preco_comercializador_potencia_idx = preco_potencia_input_idx
+
+        financiamento_tse_a_adicionar_idx = FINANCIAMENTO_TSE_VAL if not financiamento_tse_incluido_idx else 0.0
+
+        tar_energia_final_idx = {}
+        tar_potencia_final_dia_idx = tar_potencia_regulada_idx
+        # ... (lógica de Tarifa Social para TARs permanece a mesma)
+        desconto_ts_energia_aplicado_val = 0.0 
+        desconto_ts_potencia_aplicado_val = 0.0
+
+        if tarifa_social_ativa:
+            desconto_ts_energia_bruto = obter_constante('Desconto TS Energia', CONSTANTES_df)
+            desconto_ts_potencia_dia_bruto = obter_constante(f'Desconto TS Potencia {potencia_contratada_kva}', CONSTANTES_df)
+            for periodo_calc, tar_reg_val in tar_energia_regulada_idx.items():
+                tar_energia_final_idx[periodo_calc] = tar_reg_val - desconto_ts_energia_bruto 
+            desconto_ts_energia_aplicado_val = desconto_ts_energia_bruto
+
+            tar_potencia_final_dia_idx = max(0.0, tar_potencia_regulada_idx - desconto_ts_potencia_dia_bruto)
+            desconto_ts_potencia_aplicado_val = min(tar_potencia_regulada_idx, desconto_ts_potencia_dia_bruto)
+        else:
+            tar_energia_final_idx = tar_energia_regulada_idx.copy()
+
+        # --- Passo 3 Adaptado: Preços Finais Energia s/IVA ---
+        preco_energia_final_sem_iva_idx_dict = {}
+        for periodo_calc_idx_final in consumos_repartidos_dict.keys(): # Iterar sobre os períodos COM CONSUMO
+            if periodo_calc_idx_final in preco_comercializador_energia_idx_dict:
+                preco_energia_final_sem_iva_idx_dict[periodo_calc_idx_final] = (
+                    preco_comercializador_energia_idx_dict.get(periodo_calc_idx_final, 0.0) +
+                    tar_energia_final_idx.get(periodo_calc_idx_final, 0.0) +
+                    financiamento_tse_a_adicionar_idx
+                )
+            # Se um período de consumo não tem preço em preco_comercializador_energia_idx_dict (ex: tarifário só tem S, mas calculamos para V)
+            # o preço será apenas TAR + TSE. Isto deve ser tratado pela lógica de montagem de preco_energia_base_kwh_nesta_oh.
+
+        # --- Passo 4 Adaptado: Componentes Finais Potência s/IVA ---
+        preco_comercializador_potencia_final_sem_iva_idx = preco_comercializador_potencia_idx
+        # tar_potencia_final_dia_sem_iva_idx é tar_potencia_final_dia_idx
+
+        # --- Passo 5, 6, 7 (Cálculos de Custo com IVA e Taxas) - permanecem muito semelhantes ---
+        consumo_total_neste_oh_idx = sum(float(v or 0) for v in consumos_repartidos_dict.values())
+
+        decomposicao_custo_energia_idx_calc = calcular_custo_energia_com_iva(
+            consumo_total_neste_oh_idx,
+            preco_energia_final_sem_iva_idx_dict.get('S') if oh_calc_lower == "simples" else None,
+            {p: v for p, v in preco_energia_final_sem_iva_idx_dict.items() if p != 'S'},
+            dias_calculo, potencia_contratada_kva, opcao_horaria_para_calculo,
+            consumos_repartidos_dict,
+            familia_numerosa_ativa
+        )
+
+        decomposicao_custo_potencia_idx_calc = calcular_custo_potencia_com_iva_final(
+            preco_comercializador_potencia_final_sem_iva_idx,
+            tar_potencia_final_dia_idx,
+            dias_calculo,
+            potencia_contratada_kva
+        )
+
+        decomposicao_taxas_idx_calc = calcular_taxas_adicionais(
+            consumo_total_neste_oh_idx, dias_calculo, tarifa_social_ativa,
+            valor_dgeg_user_input, valor_cav_user_input,
+            nome_comercializador_atual=str(dados_tarifario_indexado_linha.get('comercializador')),
+            mes_selecionado_simulacao=mes_selecionado_pelo_user_str,
+            ano_simulacao_atual=ano_atual_calculo
+        )
+
+        # --- Passo 8: Custo Total e Descontos de Fatura (se aplicável a indexados) ---
+        custo_total_antes_desc_fatura_idx_calc = (
+            decomposicao_custo_energia_idx_calc['custo_com_iva'] +
+            decomposicao_custo_potencia_idx_calc['custo_com_iva'] +
+            decomposicao_taxas_idx_calc['custo_com_iva']
+        )
+
+        desconto_fatura_mensal_idx_excel = float(dados_tarifario_indexado_linha.get('desconto_fatura_mes', 0.0) or 0.0)
+        desconto_fatura_periodo_aplicado_idx = 0.0
+        if desconto_fatura_mensal_idx_excel > 0:
+            e_mes_completo_selecionado_idx = (dias_calculo == dias_no_mes_selecionado_dict.get(mes_selecionado_pelo_user_str, 0))
+            nome_a_exibir_final += f" (+desc. fat. {desconto_fatura_mensal_idx_excel:.2f}€/mês)"
+            desconto_fatura_periodo_aplicado_idx = (desconto_fatura_mensal_idx_excel / 30.0) * dias_calculo if not e_mes_completo_selecionado_idx else desconto_fatura_mensal_idx_excel
+
+        custo_total_final_calculado_idx = custo_total_antes_desc_fatura_idx_calc - desconto_fatura_periodo_aplicado_idx
+
+        # Preço unitário da potência s/IVA (comercializador + TAR final)
+        preco_unit_potencia_siva_idx = preco_comercializador_potencia_final_sem_iva_idx + tar_potencia_final_dia_idx # Esta é a soma correta
+
+        # --- Montar Tooltips ---
+        componentes_tooltip_custo_total_idx = {
+            'tt_cte_energia_siva': decomposicao_custo_energia_idx_calc['custo_sem_iva'],
+            'tt_cte_potencia_siva': decomposicao_custo_potencia_idx_calc['custo_sem_iva'],
+            'tt_cte_iec_siva': decomposicao_taxas_idx_calc['iec_sem_iva'],
+            'tt_cte_dgeg_siva': decomposicao_taxas_idx_calc['dgeg_sem_iva'],
+            'tt_cte_cav_siva': decomposicao_taxas_idx_calc['cav_sem_iva'],
+            'tt_cte_total_siva': decomposicao_custo_energia_idx_calc['custo_sem_iva'] + decomposicao_custo_potencia_idx_calc['custo_sem_iva'] + decomposicao_taxas_idx_calc['custo_sem_iva'],
+            'tt_cte_valor_iva_6_total': decomposicao_custo_energia_idx_calc['valor_iva_6'] + decomposicao_custo_potencia_idx_calc['valor_iva_6'] + decomposicao_taxas_idx_calc['valor_iva_6'],
+            'tt_cte_valor_iva_23_total': decomposicao_custo_energia_idx_calc['valor_iva_23'] + decomposicao_custo_potencia_idx_calc['valor_iva_23'] + decomposicao_taxas_idx_calc['valor_iva_23'],
+            'tt_cte_subtotal_civa': custo_total_antes_desc_fatura_idx_calc,
+            'tt_cte_desc_finais_valor': desconto_fatura_periodo_aplicado_idx,
+            'tt_cte_acres_finais_valor': 0.0,
+            # NOVOS CAMPOS PARA PREÇOS UNITÁRIOS NO TOOLTIP:
+            **{f"tt_preco_unit_energia_{p}_siva": v for p, v in preco_energia_final_sem_iva_idx_dict.items()},
+            'tt_preco_unit_potencia_siva': preco_unit_potencia_siva_idx
+        }
+
+        # Tooltips de Energia e Potência para Indexados (Adaptação da lógica dos Fixos)
+        componentes_tooltip_energia_dict_idx_final = {}
+        for p_key_tt_idx in preco_comercializador_energia_idx_dict.keys(): # Usar os períodos que têm preço de comercializador
+            componentes_tooltip_energia_dict_idx_final[f'tooltip_energia_{p_key_tt_idx}_comerc_sem_tar'] = preco_comercializador_energia_idx_dict.get(p_key_tt_idx, 0.0)
+            componentes_tooltip_energia_dict_idx_final[f'tooltip_energia_{p_key_tt_idx}_tar_bruta'] = tar_energia_regulada_idx.get(p_key_tt_idx, 0.0) # TAR Bruta
+            componentes_tooltip_energia_dict_idx_final[f'tooltip_energia_{p_key_tt_idx}_tse_declarado_incluido'] = financiamento_tse_incluido_idx
+            componentes_tooltip_energia_dict_idx_final[f'tooltip_energia_{p_key_tt_idx}_tse_valor_nominal'] = FINANCIAMENTO_TSE_VAL
+            componentes_tooltip_energia_dict_idx_final[f'tooltip_energia_{p_key_tt_idx}_ts_aplicada_flag'] = tarifa_social_ativa
+            componentes_tooltip_energia_dict_idx_final[f'tooltip_energia_{p_key_tt_idx}_ts_desconto_valor'] = obter_constante('Desconto TS Energia', CONSTANTES_df) if tarifa_social_ativa else 0.0
+
+        componentes_tooltip_potencia_dict_idx_final = {
+            'tooltip_pot_comerc_sem_tar': preco_comercializador_potencia_idx, # Componente comercializador (s/TAR, s/TS)
+            'tooltip_pot_tar_bruta': tar_potencia_regulada_idx, # TAR Bruta
+            'tooltip_pot_ts_aplicada': tarifa_social_ativa,
+            'tooltip_pot_desconto_ts_valor': desconto_ts_potencia_aplicado_val # Desconto TS efetivo na TAR
+        }
+
+        return {
+            'Total (€)': custo_total_final_calculado_idx,
+            'NomeParaExibirAjustado': nome_a_exibir_final,
+            'componentes_tooltip_custo_total_dict': componentes_tooltip_custo_total_idx,
+            'componentes_tooltip_energia_dict': componentes_tooltip_energia_dict_idx_final,
+            'componentes_tooltip_potencia_dict': componentes_tooltip_potencia_dict_idx_final
+        }
+
+    except KeyError as ke:
+        # st.error(f"DEBUG COMP ERRO KEY: Erro de chave '{ke}' ao calcular custo para indexado {nome_tarifario_original} na opção {opcao_horaria_para_calculo}.")
+        return None
+    except Exception as e:
+        # st.error(f"DEBUG COMP ERRO GERAL: Erro ao calcular custo para tarifário indexado {nome_tarifario_original} na opção {opcao_horaria_para_calculo}: {e}")
+        import traceback
+        # st.error(traceback.format_exc()) # Para depuração mais detalhada
+        return None
+
+
+def preparar_consumos_para_cada_opcao_destino(
+    opcao_horaria_principal_str,
+    consumos_input_atuais_dict,
+    opcoes_destino_db_nomes_list # Lista das opções de destino válidas (resultado da func anterior)
+):
+    consumos_para_calculo_por_oh_destino = {}
+    oh_principal_lower = opcao_horaria_principal_str.lower()
+
+    # Consumos introduzidos pelo utilizador para a sua opção principal
+    c_s_in = float(consumos_input_atuais_dict.get('S', 0))
+    c_v_in = float(consumos_input_atuais_dict.get('V', 0))
+    c_f_in = float(consumos_input_atuais_dict.get('F', 0)) # Para Bi
+    c_c_in = float(consumos_input_atuais_dict.get('C', 0)) # Para Tri
+    c_p_in = float(consumos_input_atuais_dict.get('P', 0)) # Para Tri
+
+    for oh_destino_str in opcoes_destino_db_nomes_list:
+        oh_destino_lower = oh_destino_str.lower()
+        consumos_finais_para_este_destino = {}
+
+        if oh_destino_lower == "simples":
+            if oh_principal_lower == "simples":
+                consumos_finais_para_este_destino['S'] = c_s_in
+            elif oh_principal_lower.startswith("bi-horário"):
+                consumos_finais_para_este_destino['S'] = c_v_in + c_f_in
+            elif oh_principal_lower.startswith("tri-horário"):
+                # Verifica se é Tri normal ou de alta potência, mas a agregação é a mesma
+                consumos_finais_para_este_destino['S'] = c_v_in + c_c_in + c_p_in
+
+        elif oh_destino_lower.startswith("bi-horário"):
+            # Esta opção de destino só é válida se a principal for Bi ou Tri
+            if oh_principal_lower.startswith("bi-horário"):
+                consumos_finais_para_este_destino['V'] = c_v_in
+                consumos_finais_para_este_destino['F'] = c_f_in
+            elif oh_principal_lower.startswith("tri-horário"):
+                consumos_finais_para_este_destino['V'] = c_v_in
+                consumos_finais_para_este_destino['F'] = c_c_in + c_p_in
+
+        elif oh_destino_lower.startswith("tri-horário"): # Inclui variantes >20.7kVA
+            # Esta opção de destino só é válida se a principal for Tri
+            if oh_principal_lower.startswith("tri-horário"):
+                consumos_finais_para_este_destino['V'] = c_v_in
+                consumos_finais_para_este_destino['C'] = c_c_in
+                consumos_finais_para_este_destino['P'] = c_p_in
+        
+        # Apenas adiciona ao dicionário se consumos_finais_para_este_destino não estiver vazio
+        # e se a soma dos consumos for maior que zero (para evitar calcular com tudo a zero)
+        if consumos_finais_para_este_destino and sum(v for v in consumos_finais_para_este_destino.values() if v is not None) > 0:
+            consumos_para_calculo_por_oh_destino[oh_destino_str] = consumos_finais_para_este_destino
+            
+    return consumos_para_calculo_por_oh_destino
+#FIM DETERMINAÇÃO DE OPÇÕES HORÁRIAS
+
+ts_global_ativa = tarifa_social # Flag global de TS
 
 # --- "Meu Tarifário" ---
 # Exibe o subheader e o conteúdo apenas se a checkbox estiver selecionada
@@ -1048,13 +2104,15 @@ if meu_tarifario_ativo:
     key_meu_desconto_energia = "meu_desconto_energia_val"
     key_meu_desconto_potencia = "meu_desconto_potencia_val"
     key_meu_desconto_fatura = "meu_desconto_fatura_val"
+    # Acréscimo
+    key_meu_acrescimo_fatura = "meu_acrescimo_fatura_val"
 
     # Lista de todas as chaves do Meu Tarifário para facilitar a limpeza
     chaves_meu_tarifario = [
         key_energia_meu_s, key_potencia_meu, key_energia_meu_v, key_energia_meu_f,
         key_energia_meu_c, key_energia_meu_p, key_meu_tar_energia, key_meu_tar_potencia,
         key_meu_fin_tse_incluido, key_meu_desconto_energia, key_meu_desconto_potencia,
-        key_meu_desconto_fatura
+        key_meu_desconto_fatura, key_meu_acrescimo_fatura
     ]
 
     # Botão para Limpar Dados do Meu Tarifário
@@ -1118,7 +2176,7 @@ if meu_tarifario_ativo:
         adicionar_financiamento_tse_meu = not checkbox_tse_incluido_estado
 
 
-    col_userd1, col_userd2, col_userd3 = st.columns(3)
+    col_userd1, col_userd2, col_userd3, col_userd4 = st.columns(4)
     with col_userd1:
         desconto_energia = st.number_input("Desconto Energia (%)", min_value=0.0, max_value=100.0, step=0.1,
                                            value=st.session_state.get(key_meu_desconto_energia, 0.0), key=key_meu_desconto_energia, help="O desconto é aplicado a Energia+TAR. Alguns tarifários não aplicam o desconto nas TAR (por exemplo os da Plenitude), pelo que o desconto não pode ser aqui aplicado. Se não tiver, não necessita preencher!")
@@ -1128,6 +2186,10 @@ if meu_tarifario_ativo:
     with col_userd3:
         desconto_fatura_input_meu = st.number_input("Desconto Fatura (€)", min_value=0.0, step=0.01, format="%.2f",
                                                  value=st.session_state.get(key_meu_desconto_fatura, 0.0), key=key_meu_desconto_fatura, help="Se não tiver, não necessita preencher!")
+    with col_userd4:
+        acrescimo_fatura_input_meu = st.number_input("Acréscimo Fatura (€)", min_value=0.0, step=0.01, format="%.2f",
+                                                 value=st.session_state.get(key_meu_acrescimo_fatura, 0.0), key=key_meu_acrescimo_fatura, help="Para outros custos fixos na fatura. Se não tiver, não necessita preencher!")
+    
 
 
     if st.button("Calcular e Adicionar O Meu Tarifário à Comparação", key="btn_meu_tarifario"):
@@ -1335,7 +2397,7 @@ if meu_tarifario_ativo:
 
         # Aplicar Desconto Fatura (€) - lógica não muda
         # 'desconto_fatura_input_meu' já é o valor do input numérico
-        custo_total_meu_tarifario_com_iva = custo_total_antes_desc_fatura - desconto_fatura_input_meu # Este é o valor da célula
+        custo_total_meu_tarifario_com_iva = custo_total_antes_desc_fatura - float(desconto_fatura_input_meu or 0.0) + float(acrescimo_fatura_input_meu or 0.0)
 
         # Calcular totais para o tooltip
         tt_cte_total_siva_meu = tt_cte_energia_siva_meu + tt_cte_potencia_siva_meu + tt_cte_iec_siva + tt_cte_dgeg_siva + tt_cte_cav_siva
@@ -1350,7 +2412,7 @@ if meu_tarifario_ativo:
         if 'desconto_fatura_input_meu' in locals() and desconto_fatura_input_meu > 0:
             tt_cte_desc_finais_valor_meu = desconto_fatura_input_meu
 
-        tt_cte_acres_finais_valor_meu = 0.0 # Normalmente não há acréscimos para "O Meu Tarifário"
+        tt_cte_acres_finais_valor_meu = float(acrescimo_fatura_input_meu or 0.0)
 
         # Adicionar ao resultado_meu_tarifario_dict
         componentes_tooltip_custo_total_dict_meu = {
@@ -1441,15 +2503,31 @@ if meu_tarifario_ativo:
         # --- 5. PREPARAR RESULTADOS PARA EXIBIÇÃO NA TABELA ---
 
         nome_para_exibir_meu_tarifario = "O Meu Tarifário"
-        # Adicionar informação do desconto ao nome se aplicável
-        if desconto_fatura_input_meu > 0:
-            # Calcular o desconto mensal para exibição no nome (se o desconto_fatura_input_meu for para o período da simulação)
-            # Se desconto_fatura_input_meu é um valor total para o período simulado 'dias':
-            desconto_equivalente_mensal = (desconto_fatura_input_meu / dias) * 30.0 if dias > 0 else 0
-            if desconto_equivalente_mensal > 0: # Evitar mostrar (€0.00 /mês) se o período for muito curto ou desconto pequeno
-                 nome_para_exibir_meu_tarifario += f" (Inclui desconto de {desconto_fatura_input_meu:.2f}€ no período)"
-            elif desconto_fatura_input_meu > 0 : # Se não for possível calcular mensalmente mas há desconto
-                 nome_para_exibir_meu_tarifario += f" (Inclui desconto de {desconto_fatura_input_meu:.2f}€ no período)"
+        sufixo_nome = "" # String para o sufixo do nome
+
+        # Converter para float, tratando valores nulos para evitar erros
+        desconto = float(desconto_fatura_input_meu or 0.0)
+        acrescimo = float(acrescimo_fatura_input_meu or 0.0)
+
+        if desconto > 0 and acrescimo > 0:
+            # Cenário 1: Ambos existem, calcular o valor líquido
+            valor_liquido = desconto - acrescimo
+            if valor_liquido > 0:
+                sufixo_nome = f" (Inclui desconto líquido de {valor_liquido:.2f}€ no período)"
+            elif valor_liquido < 0:
+                sufixo_nome = f" (Inclui acréscimo líquido de {abs(valor_liquido):.2f}€ no período)"
+            # Se valor_liquido for 0, não adicionamos sufixo pois anulam-se
+
+        elif desconto > 0:
+            # Cenário 2: Apenas desconto existe
+            sufixo_nome = f" (Inclui desconto de {desconto:.2f}€ no período)"
+
+        elif acrescimo > 0:
+            # Cenário 3: Apenas acréscimo existe
+            sufixo_nome = f" (Inclui acréscimo de {acrescimo:.2f}€ no período)"
+
+        # Adicionar o sufixo calculado ao nome final
+        nome_para_exibir_meu_tarifario += sufixo_nome
 
         valores_energia_meu_exibir_dict = {}
         if isinstance(preco_energia_final_unitario_sem_iva, dict):
@@ -1487,10 +2565,1251 @@ if meu_tarifario_ativo:
         st.success(f"Cálculo para 'O Meu Tarifário' adicionado/atualizado. Custo: {custo_total_meu_tarifario_com_iva:.2f} €")
 # --- Fim do if st.button ---
         
+
+#Seletor de Modo de Visualização - OPÇÃO HORÁRIA OU DETALHADA
+help_modo_de_comparacao = """
+    Ative para ver uma tabela que compara o custo de cada tarifário em diferentes opções horárias (Simples, Bi-Horário, Tri-Horário), usando os seus consumos inseridos.
+
+    **Estará ordenada pela opção tarifária escolhida, mas posteriormente pode ordenar por qualquer outra coluna.**
+    """
+modo_de_comparacao_ativo = st.checkbox(
+"🔬 **Comparar custos entre diferentes Opções Horárias para os mesmos consumos?**",
+    value=False, # Começa desativado por defeito
+    key="chk_modo_comparacao_opcoes",
+    help=help_modo_de_comparacao 
+)
+
+st.markdown("---") # Separador
+st.subheader("🔍 Filtros da Tabela de Resultados")
+
+# Botão para limpar filtros primeiro, para que a ação ocorra antes de ler os valores dos selectbox
+# Usaremos colunas para o layout do botão e do título de resultados
+col_titulo_resultados, col_btn_limpar = st.columns([3,1]) # Ajuste a proporção conforme necessário
+
+
+with col_btn_limpar:
+    if st.button("🧹 Remover Todos os Filtros", key="btn_remover_filtros_gerais_tabela", use_container_width=True):
+        keys_filtros_a_resetar = ["filter_segmentos_multi", "filter_tipos_multi", 
+                                  "filter_faturacao_multi", "filter_pagamento_multi"] # Nomes das chaves para multiselect
+        for k_f in keys_filtros_a_resetar:
+            if k_f in st.session_state:
+                st.session_state[k_f] = [] # Reset para lista vazia para multiselect
+        st.rerun()
+
+filt_col1, filt_col2, filt_col3, filt_col4 = st.columns(4)
+
+# --- Filtro de Segmento (agora st.selectbox) ---
+with filt_col1:
+    opcoes_filtro_segmento_user = ["Residencial", "Empresarial", "Ambos"]
+    # Encontrar o índice da opção default ("Residencial") para o selectbox
+    default_index_segmento = opcoes_filtro_segmento_user.index("Residencial")
+    
+    selected_segmento_user = st.selectbox(
+        "Segmento", 
+        opcoes_filtro_segmento_user, 
+        index=st.session_state.get("filter_segmento_selectbox_index", default_index_segmento), # Guarda o índice para manter o estado
+        key="filter_segmento_selectbox",
+        help="Escolha o segmento para a simulação."
+    )
+    # Guarda o índice selecionado no session_state
+    st.session_state.filter_segmento_selectbox_index = opcoes_filtro_segmento_user.index(selected_segmento_user)
+
+
+with filt_col2:
+    tipos_options_ms = get_filter_options_for_multiselect(tarifarios_fixos, tarifarios_indexados, 'tipo')
+    
+    # Criar o texto de ajuda formatado com Markdown
+    help_text_formatado = """
+    Deixe em branco para mostrar todos os tipos ou selecione um ou mais para filtrar.
+
+    Os tipos de tarifário são:
+    * **Fixo**: O preço da energia (€/kWh) é constante durante o contrato.
+    * **Indexado (Média)**: Preço da energia baseado na média do OMIE para os períodos horários.
+    * **Indexado (Quarto-Horário)**: Preço da energia baseado nos valores OMIE horários/quarto-horários e no perfil de consumo. Também conhecidos como 'Dinâmicos'.
+    """
+    
+    selected_tipos = st.multiselect("Tipo(s) de Tarifário", tipos_options_ms,
+                                 default=st.session_state.get("filter_tipos_multi", []),
+                                 key="filter_tipos_multi",
+                                 help=help_text_formatado) # <--- Usar a nova variável aqui
+
+# --- Filtro de Faturação (agora st.selectbox) ---
+with filt_col3:
+    opcoes_faturacao_user = ["Todas", "Fatura eletrónica", "Fatura em papel"]
+    selected_faturacao_user = st.selectbox(
+        "Faturação",
+        opcoes_faturacao_user,
+        index=st.session_state.get("filter_faturacao_selectbox_index", 0), # Default "Todas"
+        key="filter_faturacao_selectbox",
+        help="Escolha o tipo de faturação pretendido."
+    )
+    st.session_state.filter_faturacao_selectbox_index = opcoes_faturacao_user.index(selected_faturacao_user)
+
+
+# --- Filtro de Pagamento (agora st.selectbox) ---
+with filt_col4:
+    opcoes_pagamento_user = ["Todos", "Débito Direto", "Multibanco", "Numerário/Payshop/CTT"]
+    selected_pagamento_user = st.selectbox(
+        "Pagamento",
+        opcoes_pagamento_user,
+        index=st.session_state.get("filter_pagamento_selectbox_index", 0), # Default "Todos"
+        key="filter_pagamento_selectbox",
+        help="Escolha o método de pagamento."
+    )
+    st.session_state.filter_pagamento_selectbox_index = opcoes_pagamento_user.index(selected_pagamento_user)
+
+
+# --- Lógica de Aplicação dos Filtros ---
+
+# Começar com os DataFrames completos
+tf_processar = tarifarios_fixos.copy()
+ti_processar = tarifarios_indexados.copy()
+
+# 1. Lógica para o filtro de Segmento
+if selected_segmento_user != "Ambos":
+    segmentos_para_filtrar = []
+    if selected_segmento_user == "Residencial":
+        segmentos_para_filtrar.extend(["Doméstico", "Doméstico e Não Doméstico"])
+    elif selected_segmento_user == "Empresarial":
+        segmentos_para_filtrar.extend(["Não Doméstico", "Doméstico e Não Doméstico"])
+    
+    # Aplicar o filtro
+    tf_processar = tf_processar[tf_processar['segmento'].astype(str).str.strip().isin(segmentos_para_filtrar)]
+    ti_processar = ti_processar[ti_processar['segmento'].astype(str).str.strip().isin(segmentos_para_filtrar)]
+
+# 2. Lógica para o filtro de Tipo
+if selected_tipos:
+    tf_processar = tf_processar[tf_processar['tipo'].astype(str).str.strip().isin(selected_tipos)]
+    ti_processar = ti_processar[ti_processar['tipo'].astype(str).str.strip().isin(selected_tipos)]
+
+# 3. Lógica para o filtro de Faturação
+if selected_faturacao_user != "Todas":
+    faturacao_para_filtrar = []
+    if selected_faturacao_user == "Fatura eletrónica":
+        faturacao_para_filtrar.extend(["Fatura eletrónica", "Fatura eletrónica, Fatura em papel"])
+    elif selected_faturacao_user == "Fatura em papel":
+        faturacao_para_filtrar.extend(["Fatura eletrónica, Fatura em papel"]) 
+    
+    # Aplicar o filtro
+    tf_processar = tf_processar[tf_processar['faturacao'].astype(str).str.strip().isin(faturacao_para_filtrar)]
+    ti_processar = ti_processar[ti_processar['faturacao'].astype(str).str.strip().isin(faturacao_para_filtrar)]
+
+# 4. Lógica para o filtro de Pagamento
+if selected_pagamento_user != "Todos":
+    pagamento_para_filtrar = []
+    if selected_pagamento_user == "Débito Direto":
+        pagamento_para_filtrar.extend(["Débito Direto", "Débito Direto, Multibanco", "Débito Direto, Multibanco, Numerário/Payshop/CTT"])
+    elif selected_pagamento_user == "Multibanco":
+        pagamento_para_filtrar.extend(["Débito Direto, Multibanco", "Débito Direto, Multibanco, Numerário/Payshop/CTT"])
+    elif selected_pagamento_user == "Numerário/Payshop/CTT":
+        pagamento_para_filtrar.extend(["Débito Direto, Multibanco, Numerário/Payshop/CTT"])
+    
+    # Aplicar o filtro
+    tf_processar = tf_processar[tf_processar['pagamento'].astype(str).str.strip().isin(pagamento_para_filtrar)]
+    ti_processar = ti_processar[ti_processar['pagamento'].astype(str).str.strip().isin(pagamento_para_filtrar)]
+
+
+st.markdown("---") # Separador antes da tabela ou do resumo
+#FIM Seletor de Modo de Visualização - NORMAL OU OPÇÃO HORÁRIA
+
+# --- Construir Resumo dos Inputs para Exibição ---
+# --- Construir Resumo dos Inputs para Exibição ---
+cor_texto_resumo = "#333333"  # Um cinza escuro, bom para fundos claros
+
+resumo_html_parts = [
+    f"<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 6px; margin-bottom: 25px; color: {cor_texto_resumo};'>"
+]
+resumo_html_parts.append(f"<h5 style='margin-top:0; color: {cor_texto_resumo};'>Resumo da Simulação:</h5>")
+resumo_html_parts.append("<ul style='list-style-type: none; padding-left: 0;'>")
+
+# --- NOVO: Adicionar detalhes dos filtros numa única linha ---
+# 1. Tratar o caso especial do segmento "Ambos"
+if selected_segmento_user == "Ambos":
+    segmento_para_resumo = "Residencial e Empresarial"
+else:
+    segmento_para_resumo = selected_segmento_user
+
+# 2. Construir a string combinada
+# &nbsp; é o código HTML para um espaço, para dar um espaçamento agradável
+linha_filtros = (
+    f"<b>Segmento:</b> {segmento_para_resumo} &nbsp;&nbsp;|&nbsp;&nbsp; "
+    f"<b>Faturação:</b> {selected_faturacao_user} &nbsp;&nbsp;|&nbsp;&nbsp; "
+    f"<b>Pagamento:</b> {selected_pagamento_user}"
+)
+
+# 3. Adicionar a linha única ao resumo
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'>{linha_filtros}</li>")
+# --- FIM DO NOVO BLOCO ---
+
+# 1. Potência contratada + Opção Horária e Ciclo
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>{potencia} kVA</b> em <b>{opcao_horaria}</b></li>")
+
+# 2. Consumo dividido por opção
+consumo_detalhe_str = ""
+if opcao_horaria.lower() == "simples":
+    consumo_detalhe_str = f"Simples: {consumo_simples:.0f} kWh"
+elif opcao_horaria.lower().startswith("bi"):
+    consumo_detalhe_str = f"Vazio: {consumo_vazio:.0f} kWh, Fora Vazio: {consumo_fora_vazio:.0f} kWh"
+elif opcao_horaria.lower().startswith("tri"):
+    consumo_detalhe_str = f"Vazio: {consumo_vazio:.0f} kWh, Cheias: {consumo_cheias:.0f} kWh, Ponta: {consumo_ponta:.0f} kWh"
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Consumos ({consumo:.0f} kWh Total):</b> {consumo_detalhe_str}</li>")
+
+# 3. Datas e Dias Faturados
+# 'dias_default_calculado' e 'dias' já foram calculados
+# 'dias_manual_input_val' é o valor do widget st.number_input para dias manuais
+dias_manual_valor_do_input = st.session_state.get('dias_manual_input_key', dias_default_calculado) # Use a key correta do seu input
+usou_dias_manuais_efetivamente = False
+if pd.notna(dias_manual_valor_do_input) and dias_manual_valor_do_input > 0 and \
+   int(dias_manual_valor_do_input) != dias_default_calculado:
+    usou_dias_manuais_efetivamente = True
+
+if usou_dias_manuais_efetivamente:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Período:</b> {dias} dias (definido manualmente)</li>")
+else:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Período:</b> De {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')} ({dias} dias)</li>")
+
+# 4. Valores OMIE da opção escolhida, com a referência
+omie_valores_str_parts = []
+if opcao_horaria.lower() == "simples":
+    val_s = st.session_state.get('omie_s_input_field', round(omie_medios_calculados.get('S',0), 2))
+    omie_valores_str_parts.append(f"Simples: {val_s:.2f} €/MWh")
+elif opcao_horaria.lower().startswith("bi"):
+    val_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2))
+    val_f = st.session_state.get('omie_f_input_field', round(omie_medios_calculados.get('F',0), 2))
+    omie_valores_str_parts.append(f"Vazio: {val_v:.2f} €/MWh")
+    omie_valores_str_parts.append(f"Fora Vazio: {val_f:.2f} €/MWh")
+elif opcao_horaria.lower().startswith("tri"):
+    val_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2))
+    val_c = st.session_state.get('omie_c_input_field', round(omie_medios_calculados.get('C',0), 2))
+    val_p = st.session_state.get('omie_p_input_field', round(omie_medios_calculados.get('P',0), 2))
+    omie_valores_str_parts.append(f"Vazio: {val_v:.2f} €/MWh")
+    omie_valores_str_parts.append(f"Cheias: {val_c:.2f} €/MWh")
+    omie_valores_str_parts.append(f"Ponta: {val_p:.2f} €/MWh")
+
+if omie_valores_str_parts: # Só mostra a secção OMIE se houver valores a exibir
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>OMIE {nota_omie}:</b> {', '.join(omie_valores_str_parts)}</li>")
+
+# 5. Perfil de consumo utilizado
+perfil_consumo_calculado_str = obter_perfil(consumo, dias, potencia) # Chamar a sua função
+# Formatar para uma apresentação mais amigável
+texto_perfil_apresentacao = perfil_consumo_calculado_str.replace("perfil_", "Perfil ").upper() # Ex: "Perfil A"
+resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Perfil de Consumo:</b> {texto_perfil_apresentacao}</li>")
+
+# 6. Tarifa Social (se ativa)
+if tarifa_social:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px; color: red;'><b>Benefício Aplicado:</b> Tarifa Social</li>")
+
+# 7. Família Numerosa (se ativa)
+if familia_numerosa:
+    resumo_html_parts.append(f"<li style='margin-bottom: 5px; color: red;'><b>Benefício Aplicado:</b> Família Numerosa</li>")
+
+resumo_html_parts.append("</ul>")
+resumo_html_parts.append("</div>")
+html_resumo_final = "".join(resumo_html_parts)
+
+# Exibir o resumo
+st.markdown(html_resumo_final, unsafe_allow_html=True)
+
+
+resultados_list.clear() # Limpar a lista de resultados no início de cada execução
+
+if modo_de_comparacao_ativo:
+    # --- INÍCIO DO NOVO BLOCO PARA O MODO DE COMPARAÇÃO DE OPÇÕES HORÁRIAS ---
+    st.subheader("📊 Tiago Felícia - Comparação de Custos entre Opções Tarifárias")
+    st.markdown("➡️ [**Exportar Tabela de Comparação para Excel**](#exportar-excel-comparacao)")
+
+#Vários JS, alguns repetidos
+    #CORES PARA TARIFÁRIOS INDEXADOS:
+    cor_fundo_indexado_media_css = "#FFE699"
+    cor_texto_indexado_media_css = "black"
+    cor_fundo_indexado_dinamico_css = "#4D79BC"  
+    cor_texto_indexado_dinamico_css = "white"
+
+    cell_style_nome_tarifario_js = JsCode(f"""
+    function(params) {{
+        // Estilo base aplicado a todas as células desta coluna
+        let styleToApply = {{ 
+            textAlign: 'center',
+            borderRadius: '6px',  // O teu borderRadius desejado
+            padding: '10px 10px'   // O teu padding desejado
+            // Podes adicionar um backgroundColor default para células não especiais aqui, se quiseres
+            // backgroundColor: '#f0f0f0' // Exemplo para tarifários fixos
+        }};                                  
+
+        if (params.data) {{
+            const nomeExibir = params.data.NomeParaExibir;
+            const tipoTarifario = params.data.Tipo;
+
+            // VERIFICA SE O NOME COMEÇA COM "O Meu Tarifário"
+            if (typeof nomeExibir === 'string' && nomeExibir.startsWith('O Meu Tarifário')) {{
+                styleToApply.backgroundColor = 'red';
+                styleToApply.color = 'white';
+                styleToApply.fontWeight = 'bold';
+            }} else if (tipoTarifario === 'Indexado Média') {{
+                styleToApply.backgroundColor = '{cor_fundo_indexado_media_css}';
+                styleToApply.color = '{cor_texto_indexado_media_css}';
+            }} else if (tipoTarifario === 'Indexado quarto-horário') {{
+                styleToApply.backgroundColor = '{cor_fundo_indexado_dinamico_css}';
+                styleToApply.color = '{cor_texto_indexado_dinamico_css}';
+            }} else {{
+                // Para tarifários fixos ou outros tipos não explicitamente coloridos acima.
+                // Eles já terão o textAlign, borderRadius e padding do styleToApply.
+                // Se quiseres um fundo específico para eles diferente do default do styleToApply, define aqui.
+                // Ex: styleToApply.backgroundColor = '#e9ecef'; // Uma cor neutra para fixos
+            }}
+            return styleToApply;
+        }}
+        return styleToApply; 
+    }}
+    """)
+
+    #tooltip Nome Tarifario
+    tooltip_nome_tarifario_getter_js = JsCode("""
+    function(params) {
+        if (!params.data) { 
+            return params.value || ''; 
+        }
+
+        const nomeExibir = params.data.NomeParaExibir || '';
+        const notas = params.data.info_notas || ''; 
+
+        let tooltipHtmlParts = [];
+
+        if (nomeExibir) {
+            tooltipHtmlParts.push("<strong>" + nomeExibir + "</strong>");
+        }
+
+        if (notas) {
+            const notasHtml = notas.replace(/\\n/g, ' ').replace(/\n/g, ' ');
+            // Usando aspas simples para atributos de estilo HTML para simplificar
+            tooltipHtmlParts.push("<small style='display: block; margin-top: 5px;'><i>" + notasHtml + "</i></small>");
+        }
+    
+        if (tooltipHtmlParts.length > 0) {
+            // Se ambos nomeExibir e notas existem, queremos uma quebra de linha entre eles no tooltip.
+            // Se join(''), eles ficam lado a lado. Se join('<br>'), ficam em linhas separadas.
+            // Dado que a nota tem display:block, o join('') deve funcionar para colocá-los em "blocos" separados.
+            return tooltipHtmlParts.join(''); // Para agora, vamos juntar diretamente.
+                                                // Se quiser uma quebra de linha explícita entre o nome e as notas,
+                                                 // e ambos existirem, pode usar:
+                                                 // return tooltipHtmlParts.join('<br style="margin-bottom:5px">');
+        }
+    
+        return ''; 
+    }
+            """)
+        
+    # Custom_Tooltip
+    custom_tooltip_component_js = JsCode("""
+        class CustomTooltip {
+            init(params) {
+                // params.value é a string que o seu tooltipValueGetter retorna
+                this.eGui = document.createElement('div');
+                // Para permitir HTML, definimos o innerHTML
+                // É importante que a string de params.value seja HTML seguro se vier de inputs do utilizador,
+                // mas no seu caso, está a construí-lo programaticamente.
+                this.eGui.innerHTML = params.value; 
+
+                // Aplicar algum estilo básico para o tooltip se desejar
+                this.eGui.style.backgroundColor = 'white'; // Ou outra cor de fundo
+                this.eGui.style.color = 'black';           // Cor do texto
+                this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
+                this.eGui.style.padding = '10px';           // Mais padding
+                this.eGui.style.borderRadius = '6px';      // Cantos arredondados
+                this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
+                this.eGui.style.maxWidth = '400px';        // Largura máxima
+                this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
+                this.eGui.style.fontFamily = 'Arial, sans-serif'; // Tipo de fonte                             
+                this.eGui.style.whiteSpace = 'normal';     // Para quebra de linha
+            }
+
+            getGui() {
+                return this.eGui;
+            }
+        }
+    """)
+
+
+    custom_css = {
+        ".ag-header-cell-label": {
+            "justify-content": "center !important",
+            "text-align": "center !important",
+            "font-size": "14px !important",      # <-- aumenta o header
+            "font-weight": "bold !important"
+        },
+        ".ag-center-header": {
+            "justify-content": "center !important",
+            "text-align": "center !important",
+            "font-size": "14px !important"       # <-- reforço para headers
+        },
+        ".ag-cell": {
+            "font-size": "14px !important"       # <-- aumenta valores das células
+        },
+        ".ag-center-cols-clip": {"justify-content": "center !important", "text-align": "center !important"}
+    }
+
+        # --- 1. DEFINIR O JsCode PARA LINK E TOOLTIP ---
+    link_tooltip_renderer_js = JsCode("""
+    class LinkTooltipRenderer {
+        init(params) {
+            this.eGui = document.createElement('div');
+            let displayText = params.value; // Valor da célula (NomeParaExibir)
+            let url = params.data.LinkAdesao; // Acede ao valor da coluna LinkAdesao da mesma linha
+
+            if (url && typeof url === 'string' && url.toLowerCase().startsWith('http')) {
+                // HTML para o link clicável
+                // O atributo 'title' (tooltip) mostrará "Aderir/Saber mais: [URL]"
+                // O texto visível do link será o 'displayText' (NomeParaExibir)
+                this.eGui.innerHTML = `<a href="${url}" target="_blank" title="Aderir/Saber mais: ${url}" style="text-decoration: underline; color: inherit;">${displayText}</a>`;
+            } else {
+                // Se não houver URL válido, apenas mostra o displayText com o próprio displayText como tooltip.
+                this.eGui.innerHTML = `<span title="${displayText}">${displayText}</span>`;
+            }
+        }
+        getGui() { return this.eGui; }
+    }
+    """) # <--- FIM DA DEFINIÇÃO DE link_tooltip_renderer_js
+
+
+    resultados_comparacao_list = [] # Usar uma lista dedicada para este modo
+
+    # 1. Obter consumos atuais (já tem esta lógica - consumos_input_atuais_dict_comp)
+    consumos_input_atuais_dict_comp = {} 
+    if opcao_horaria.lower() == "simples":
+        consumos_input_atuais_dict_comp['S'] = consumo_simples
+    elif opcao_horaria.lower().startswith("bi-horário"):
+        consumos_input_atuais_dict_comp['V'] = consumo_vazio
+        consumos_input_atuais_dict_comp['F'] = consumo_fora_vazio
+    elif opcao_horaria.lower().startswith("tri-horário"):
+        consumos_input_atuais_dict_comp['V'] = consumo_vazio
+        consumos_input_atuais_dict_comp['C'] = consumo_cheias
+        consumos_input_atuais_dict_comp['P'] = consumo_ponta
+
+    # Criação de todos_omie_inputs_utilizador_comp (já tem nas linhas 905-912)
+    # Certifique-se que omie_medios_calculados está disponível aqui
+    todos_omie_inputs_utilizador_comp_comparacao = {
+        'S': st.session_state.get('omie_s_input_field', round(omie_medios_calculados.get('S',0), 2)),
+        'V': st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2)),
+        'F': st.session_state.get('omie_f_input_field', round(omie_medios_calculados.get('F',0), 2)),
+        'C': st.session_state.get('omie_c_input_field', round(omie_medios_calculados.get('C',0), 2)),
+        'P': st.session_state.get('omie_p_input_field', round(omie_medios_calculados.get('P',0), 2))
+    }
+       
+    # 2. Determinar colunas de destino e ordenação (já tem - determinar_opcoes_horarias_destino_e_ordenacao)
+    opcoes_destino_db_nomes_comp, colunas_aggrid_custo_comp, coluna_ordenacao_aggrid_comp = \
+        determinar_opcoes_horarias_destino_e_ordenacao(
+            opcao_horaria, 
+            potencia,      
+            consumos_input_atuais_dict_comp, 
+            opcoes_horarias_existentes 
+        )
+
+    if not opcoes_destino_db_nomes_comp:
+        st.warning("Não há opções horárias válidas para comparação com os inputs selecionados.")
+    else:
+        # Preparar consumos repartidos (já tem - preparar_consumos_para_cada_opcao_destino)
+        consumos_repartidos_finais_por_oh_comp = preparar_consumos_para_cada_opcao_destino(
+            opcao_horaria, 
+            consumos_input_atuais_dict_comp,
+            opcoes_destino_db_nomes_comp 
+        )
+
+        # 3. "Loop Principal Modificado" para o modo de comparação:
+        nomes_tarifarios_unicos_para_comparacao = []
+        if not tf_processar.empty: # USAR tf_processar
+            temp_fixos_unicos = tf_processar[['nome', 'comercializador', 'tipo', 'site_adesao', 'notas']].drop_duplicates(subset=['nome', 'comercializador'])
+            for _, row_fixo in temp_fixos_unicos.iterrows():
+                nomes_tarifarios_unicos_para_comparacao.append(dict(row_fixo))
+
+        if comparar_indexados and not ti_processar.empty: # USAR ti_processar
+            temp_index_unicos = ti_processar[['nome', 'comercializador', 'tipo', 'site_adesao', 'notas', 'formula_calculo']].drop_duplicates(subset=['nome', 'comercializador'])
+            for _, row_idx in temp_index_unicos.iterrows():
+                if not any(d['nome'] == row_idx['nome'] and d['comercializador'] == row_idx['comercializador'] for d in nomes_tarifarios_unicos_para_comparacao):
+                    nomes_tarifarios_unicos_para_comparacao.append(dict(row_idx))
+
+        if meu_tarifario_ativo and 'meu_tarifario_calculado' in st.session_state:
+            omt_data = st.session_state['meu_tarifario_calculado']
+            # Adicionar informação para identificar "O Meu Tarifário" e a sua opção horária original
+            nomes_tarifarios_unicos_para_comparacao.append({
+                'nome': omt_data.get('NomeParaExibir', "O Meu Tarifário"),
+                'comercializador': omt_data.get('Comercializador', "-"),
+                'tipo': omt_data.get('Tipo', "Pessoal"),
+                'site_adesao': omt_data.get('LinkAdesao', '-'),
+                'notas': omt_data.get('info_notas', ''), # 'info_notas' é o campo esperado pela AgGrid
+                'is_meu_tarifario': True, # Flag para identificar "O Meu Tarifário"
+                'opcao_horaria_original_meu_tarifario': omt_data.get('opcao_horaria_calculada')
+            })
+            
+        for info_tar_base in nomes_tarifarios_unicos_para_comparacao:
+            nome_t_comp = info_tar_base['nome']
+            comerc_t_comp = info_tar_base['comercializador']
+            tipo_t_comp = str(info_tar_base['tipo'])
+            link_t_comp = info_tar_base.get('site_adesao', '-')
+            notas_t_comp = info_tar_base.get('notas', '')
+            formula_calculo_idx_comp = str(info_tar_base.get('formula_calculo', '')) # Para indexados
+
+            linha_para_aggrid = {
+                'NomeParaExibir': nome_t_comp,
+                'Comercializador': comerc_t_comp,
+                'Tipo': tipo_t_comp,
+                'LinkAdesao': link_t_comp, # LinkAdesao é usado pela AgGrid principal, não faz mal estar aqui
+                'info_notas': notas_t_comp  # info_notas é usado pela AgGrid principal
+            }
+            teve_pelo_menos_um_calculo_nesta_linha = False
+
+            for oh_destino_db_nome in opcoes_destino_db_nomes_comp:
+                nome_coluna_aggrid_para_este_oh = f"Total {oh_destino_db_nome} (€)"
+                linha_para_aggrid[nome_coluna_aggrid_para_este_oh] = None # Inicializa a coluna de custo
+
+                consumos_para_calculo_nesta_oh = consumos_repartidos_finais_por_oh_comp.get(oh_destino_db_nome)
+                if not consumos_para_calculo_nesta_oh or sum(v for v in consumos_para_calculo_nesta_oh.values() if v is not None) == 0:
+                    continue # Pula se não houver consumos para esta opção de destino
+                
+                dados_tarifario_especifico_para_calculo = None # DataFrame da linha específica do tarifário
+                
+                # Lógica para "O Meu Tarifário" na Tabela Comparativa
+                if info_tar_base.get('is_meu_tarifario'):
+                    if 'meu_tarifario_calculado' in st.session_state:
+                        # Recalcular "O Meu Tarifário" para a opção de destino atual (oh_destino_db_nome)
+                        # usando os consumos de `consumos_para_calculo_nesta_oh`
+                        # Esta parte é complexa porque "O Meu Tarifário" é definido por inputs diretos de preço
+                        # e não por uma linha de dados do Excel como os outros.
+                        # Precisaremos de uma função adaptada ou lógica aqui para recalcular.
+                        # Por simplicidade, vamos mostrar o custo original se for a opção original, senão None.
+                        if info_tar_base.get('opcao_horaria_original_meu_tarifario') == oh_destino_db_nome:
+                             omt_data_calc = st.session_state['meu_tarifario_calculado']
+                             linha_para_aggrid[nome_coluna_aggrid_para_este_oh] = omt_data_calc.get('Total (€)')
+                             # linha_para_aggrid[f'Tooltip {nome_coluna_aggrid_para_este_oh}'] = omt_data_calc.get('componentes_tooltip_custo_total_dict_meu')
+                             teve_pelo_menos_um_calculo_nesta_linha = True
+                        # else: O custo para outras opções de destino para "O Meu Tarifário" não é calculado aqui.
+                    continue # Vai para o próximo oh_destino_db_nome
+
+                # Lógica para tarifários do Excel
+                if tipo_t_comp == "Fixo":
+                    df_match = tarifarios_fixos[
+                        (tarifarios_fixos['nome'] == nome_t_comp) &
+                        (tarifarios_fixos['comercializador'] == comerc_t_comp) &
+                        (tarifarios_fixos['opcao_horaria_e_ciclo'] == oh_destino_db_nome) &
+                        (tarifarios_fixos['potencia_kva'] == potencia)
+                    ]
+                    if not df_match.empty:
+                        dados_tarifario_especifico_para_calculo = df_match.iloc[0]
+                
+                elif tipo_t_comp.startswith("Indexado"):
+                    df_match_idx = tarifarios_indexados[
+                        (tarifarios_indexados['nome'] == nome_t_comp) &
+                        (tarifarios_indexados['comercializador'] == comerc_t_comp) &
+                        (tarifarios_indexados['opcao_horaria_e_ciclo'] == oh_destino_db_nome) &
+                        (tarifarios_indexados['potencia_kva'] == potencia)
+                    ]
+                    if not df_match_idx.empty:
+                        dados_tarifario_especifico_para_calculo = df_match_idx.iloc[0]
+
+                if dados_tarifario_especifico_para_calculo is not None:
+                    resultado_celula = None
+                    if tipo_t_comp == "Fixo":
+                        resultado_celula = calcular_detalhes_custo_tarifario_fixo(
+                            dados_tarifario_especifico_para_calculo, oh_destino_db_nome,
+                            consumos_para_calculo_nesta_oh, potencia, dias, tarifa_social, familia_numerosa,
+                            valor_dgeg_user, valor_cav_user, incluir_quota_acp, desconto_continente,
+                            CONSTANTES, dias_mes, mes, ano_atual, data_inicio, data_fim
+                        )
+                    elif tipo_t_comp.startswith("Indexado"):
+                        resultado_celula = calcular_detalhes_custo_tarifario_indexado(
+                            dados_tarifario_especifico_para_calculo, oh_destino_db_nome, opcao_horaria, # Passa opcao_horaria PRINCIPAL
+                            consumos_para_calculo_nesta_oh, potencia, dias, tarifa_social, familia_numerosa,
+                            valor_dgeg_user, valor_cav_user, CONSTANTES,
+                            df_omie_ajustado, # Passar o global
+                            perdas_medias,    # Passar o global
+                            todos_omie_inputs_utilizador_comp_comparacao, # OMIEs dos inputs PRINCIPAIS
+                            omie_medios_calculados_para_todos_ciclos, # OMIEs CALCULADOS para todos os ciclos
+                            omie_medio_simples_real_kwh, # OMIE real simples para Luzigas
+                            dias_mes, mes, ano_atual, data_inicio, data_fim
+                        )
+                    
+                    if resultado_celula and pd.notna(resultado_celula.get('Total (€)')):
+                        linha_para_aggrid[nome_coluna_aggrid_para_este_oh] = resultado_celula['Total (€)']
+                        # Guardar tooltips para cada célula da tabela comparativa
+                        linha_para_aggrid[f'Tooltip_{nome_coluna_aggrid_para_este_oh}'] = resultado_celula.get('componentes_tooltip_custo_total_dict')
+                        teve_pelo_menos_um_calculo_nesta_linha = True
+            
+            if teve_pelo_menos_um_calculo_nesta_linha:
+                 resultados_comparacao_list.append(linha_para_aggrid)
+
+        df_resultados_comparacao_aggrid = pd.DataFrame(resultados_comparacao_list)
+        
+        if not df_resultados_comparacao_aggrid.empty:
+            if 'coluna_ordenacao_aggrid_comp' in locals() and \
+               coluna_ordenacao_aggrid_comp and \
+               coluna_ordenacao_aggrid_comp in df_resultados_comparacao_aggrid.columns:
+                df_resultados_comparacao_aggrid = df_resultados_comparacao_aggrid.sort_values(
+                    by=coluna_ordenacao_aggrid_comp,
+                    ascending=True,
+                    na_position='last'
+                ).reset_index(drop=True)
+        
+            # --- CONFIGURAÇÃO DO AGGRID PARA O MODO DE COMPARAÇÃO ---
+            gb_comp = GridOptionsBuilder.from_dataframe(df_resultados_comparacao_aggrid)
+            gb_comp.configure_default_column(
+                sortable=True, resizable=True, editable=False, wrapText=True, autoHeight=True,
+                wrapHeaderText=True, autoHeaderHeight=True
+            )
+            
+            # Coluna NomeParaExibir com Link e Tooltip de Notas
+            gb_comp.configure_column(
+                field='NomeParaExibir', 
+                headerName='Tarifário', 
+                minWidth=200, flex=2.5, 
+                filter='agTextColumnFilter', 
+                cellRenderer=link_tooltip_renderer_js, # <--- APLICAR RENDERER
+                cellStyle=cell_style_nome_tarifario_js,
+                tooltipValueGetter=tooltip_nome_tarifario_getter_js, 
+                tooltipComponent=custom_tooltip_component_js
+            )
+            
+            # Ocultar colunas que agora estão integradas no NomeParaExibir ou não são necessárias
+            if 'LinkAdesao' in df_resultados_comparacao_aggrid.columns:
+                 gb_comp.configure_column('LinkAdesao', hide=True)
+            if 'info_notas' in df_resultados_comparacao_aggrid.columns:
+                 gb_comp.configure_column('info_notas', hide=True)
+            if 'Comercializador' in df_resultados_comparacao_aggrid.columns:
+                gb_comp.configure_column('Comercializador', hide=True)
+            if 'Tipo' in df_resultados_comparacao_aggrid.columns:
+                gb_comp.configure_column('Tipo', hide=True)
+
+            # Colunas de Comercializador e Tipo (mais simples)
+            if 'Comercializador' in df_resultados_comparacao_aggrid.columns:
+                gb_comp.configure_column('Comercializador', headerName='Comercializador', minWidth=120, flex=1, cellStyle={'textAlign': 'center'})
+            if 'Tipo' in df_resultados_comparacao_aggrid.columns:
+                gb_comp.configure_column('Tipo', headerName='Tipo', minWidth=100, flex=1, cellStyle={'textAlign': 'center'})
+            
+            # Colunas de Custo (ex: "Total Simples (€)")
+            if 'colunas_aggrid_custo_comp' in locals(): # Certifica-se de que a variável existe
+                # Recriar min_max_data_comparativa_js e cell_style_cores_comparativa_js com base em df_resultados_comparacao_aggrid
+                min_max_data_comparativa_js_local = {}
+                for col_custo_comp_inner in colunas_aggrid_custo_comp:
+                    if col_custo_comp_inner in df_resultados_comparacao_aggrid:
+                        series_comp_inner = pd.to_numeric(df_resultados_comparacao_aggrid[col_custo_comp_inner], errors='coerce').dropna()
+                        if not series_comp_inner.empty:
+                            min_max_data_comparativa_js_local[col_custo_comp_inner] = {'min': series_comp_inner.min(), 'max': series_comp_inner.max()}
+                        else:
+                            min_max_data_comparativa_js_local[col_custo_comp_inner] = {'min': 0, 'max': 0}
+                min_max_data_comparativa_json_string_local = json.dumps(min_max_data_comparativa_js_local)
+
+                cell_style_cores_comparativa_js_local = JsCode(f"""
+                function(params) {{
+                    const minMaxConfig = {min_max_data_comparativa_json_string_local}; 
+                    let style = {{ textAlign: 'center', borderRadius: '6px', padding: '10px 10px' }};
+                    if (params.value == null || isNaN(parseFloat(params.value)) || !minMaxConfig[params.colDef.field]) return style;
+                    const min_val = minMaxConfig[params.colDef.field].min;
+                    const max_val = minMaxConfig[params.colDef.field].max;
+                    if (max_val === min_val) {{ style.backgroundColor = 'lightgrey'; return style; }}
+                    const normalized_value = Math.max(0, Math.min(1, (parseFloat(params.value) - min_val) / (max_val - min_val)));
+                    const cL={{r:99,g:190,b:123}},cM={{r:255,g:255,b:255}},cH={{r:248,g:105,b:107}}; let r,g,b;
+                    if(normalized_value < 0.5){{const t=normalized_value/0.5;r=Math.round(cL.r*(1-t)+cM.r*t);g=Math.round(cL.g*(1-t)+cM.g*t);b=Math.round(cL.b*(1-t)+cM.b*t);}}
+                    else{{const t=(normalized_value-0.5)/0.5;r=Math.round(cM.r*(1-t)+cH.r*t);g=Math.round(cM.g*(1-t)+cH.g*t);b=Math.round(cM.b*(1-t)+cH.b*t);}}
+                    style.backgroundColor=`rgb(${{r}},${{g}},${{b}})`;
+                    if((r*0.299+g*0.587+b*0.114)<140)style.color='white';else style.color='black';
+                    return style;
+                }}
+                """)
+                
+                # Tooltip para colunas de custo na tabela comparativa
+                tooltip_custo_total_comparativa_js = JsCode("""
+                function(params) {
+                    if (!params.data || params.value == null) { return String(params.value); }
+                    const colField = params.colDef.field; // Ex: "Total Simples (€)"
+                    const tooltipDataKey = "Tooltip_" + colField; 
+                    const tooltipData = params.data[tooltipDataKey];
+
+                    const formatCurrency = (num) => (typeof num === 'number' && !isNaN(num)) ? num.toFixed(2) : 'N/A';
+                    const formatUnitPrice = (num) => (typeof num === 'number' && !isNaN(num)) ? num.toFixed(4) : 'N/A'; // 4 casas para €/kWh ou €/dia
+
+                    let tooltipParts = [];
+                    
+                    if (!tooltipData) { 
+                        tooltipParts.push("<i>" + (params.data.NomeParaExibir || "Tarifário") + " - " + colField.replace("Total ", "").replace(" (€)", "") + "</i>");
+                        tooltipParts.push("<b>Custo Total c/IVA: " + formatCurrency(parseFloat(params.value)) + " €</b>");
+                        return tooltipParts.join("<br>");
+                    }
+
+                    tooltipParts.push("<i>" + (params.data.NomeParaExibir || "Tarifário") + " - " + colField.replace("Total ", "").replace(" (€)", "") + "</i>");
+                    
+                    // Preços Unitários s/IVA (NOVOS)
+                    tooltipParts.push("<b>Preços Unitários (s/IVA):</b>");
+                    let temPrecosUnitarios = false;
+                    if (colField.includes("Simples")) {
+                        if (tooltipData.tt_preco_unit_energia_S_siva != null) {
+                            tooltipParts.push("&nbsp;&nbsp;Energia Simples: " + formatUnitPrice(tooltipData.tt_preco_unit_energia_S_siva) + " €/kWh");
+                            temPrecosUnitarios = true;
+                        }
+                    } else if (colField.includes("Bi-horário")) {
+                        if (tooltipData.tt_preco_unit_energia_V_siva != null) {
+                            tooltipParts.push("&nbsp;&nbsp;Energia Vazio: " + formatUnitPrice(tooltipData.tt_preco_unit_energia_V_siva) + " €/kWh");
+                            temPrecosUnitarios = true;
+                        }
+                        if (tooltipData.tt_preco_unit_energia_F_siva != null) {
+                            tooltipParts.push("&nbsp;&nbsp;Energia Fora Vazio: " + formatUnitPrice(tooltipData.tt_preco_unit_energia_F_siva) + " €/kWh");
+                            temPrecosUnitarios = true;
+                        }
+                    } else if (colField.includes("Tri-horário")) {
+                        if (tooltipData.tt_preco_unit_energia_V_siva != null) {
+                            tooltipParts.push("&nbsp;&nbsp;Energia Vazio: " + formatUnitPrice(tooltipData.tt_preco_unit_energia_V_siva) + " €/kWh");
+                            temPrecosUnitarios = true;
+                        }
+                        if (tooltipData.tt_preco_unit_energia_C_siva != null) {
+                            tooltipParts.push("&nbsp;&nbsp;Energia Cheias: " + formatUnitPrice(tooltipData.tt_preco_unit_energia_C_siva) + " €/kWh");
+                            temPrecosUnitarios = true;
+                        }
+                        if (tooltipData.tt_preco_unit_energia_P_siva != null) {
+                            tooltipParts.push("&nbsp;&nbsp;Energia Ponta: " + formatUnitPrice(tooltipData.tt_preco_unit_energia_P_siva) + " €/kWh");
+                            temPrecosUnitarios = true;
+                        }
+                    }
+                    if (tooltipData.tt_preco_unit_potencia_siva != null) {
+                        tooltipParts.push("&nbsp;&nbsp;Potência: " + formatUnitPrice(tooltipData.tt_preco_unit_potencia_siva) + " €/dia");
+                        temPrecosUnitarios = true;
+                    }
+                    if(temPrecosUnitarios){
+                         tooltipParts.push("------------------------------------");
+                    }
+
+                    // Decomposição original do tooltip
+                    tooltipParts.push("<b>Decomposição Custo Total:</b>");
+                    tooltipParts.push("------------------------------------");
+                                                
+                    tooltipParts.push("Total Energia s/IVA: " + formatCurrency(tooltipData.tt_cte_energia_siva) + " €");
+                    tooltipParts.push("Total Potência s/IVA: " + formatCurrency(tooltipData.tt_cte_potencia_siva) + " €");
+                    if (tooltipData.tt_cte_iec_siva !== 0) { 
+                        tooltipParts.push("IEC s/IVA: " + formatCurrency(tooltipData.tt_cte_iec_siva) + " €");
+                    }
+                    // ... (resto da decomposição original do tooltip, como estava antes) ...
+                    if (tooltipData.tt_cte_dgeg_siva !== 0) { tooltipParts.push("DGEG s/IVA: " + formatCurrency(tooltipData.tt_cte_dgeg_siva) + " €");}
+                    if (tooltipData.tt_cte_cav_siva !== 0) { tooltipParts.push("CAV s/IVA: " + formatCurrency(tooltipData.tt_cte_cav_siva) + " €");}
+                    tooltipParts.push("<b>Subtotal s/IVA: " + formatCurrency(tooltipData.tt_cte_total_siva) + " €</b>");
+                    tooltipParts.push("------------------------------------");
+                    if (tooltipData.tt_cte_valor_iva_6_total !== 0) { tooltipParts.push("Valor IVA (6%): " + formatCurrency(tooltipData.tt_cte_valor_iva_6_total) + " €");}
+                    if (tooltipData.tt_cte_valor_iva_23_total !== 0) { tooltipParts.push("Valor IVA (23%): " + formatCurrency(tooltipData.tt_cte_valor_iva_23_total) + " €");}
+                    tooltipParts.push("<b>Subtotal c/IVA: " + formatCurrency(tooltipData.tt_cte_subtotal_civa) + " €</b>");
+                    if (tooltipData.tt_cte_desc_finais_valor !== 0 || tooltipData.tt_cte_acres_finais_valor !== 0) { tooltipParts.push("------------------------------------");}
+                    if (tooltipData.tt_cte_desc_finais_valor !== 0) { tooltipParts.push("Outros Descontos: -" + formatCurrency(tooltipData.tt_cte_desc_finais_valor) + " €");}
+                    if (tooltipData.tt_cte_acres_finais_valor !== 0) { tooltipParts.push("Outros Acréscimos: +" + formatCurrency(tooltipData.tt_cte_acres_finais_valor) + " €");}
+                    if (tooltipData.tt_cte_desc_finais_valor !== 0 || tooltipData.tt_cte_acres_finais_valor !== 0) { tooltipParts.push("------------------------------------");}
+                    tooltipParts.push("<b>Custo Total c/IVA: " + formatCurrency(parseFloat(params.value)) + " €</b>");
+
+                    return tooltipParts.filter(part => part !== "").join("<br>");
+                }
+                """)
+
+                for col_custo_nome_comp in colunas_aggrid_custo_comp:
+                    if col_custo_nome_comp in df_resultados_comparacao_aggrid.columns:
+                        gb_comp.configure_column(
+                            field=col_custo_nome_comp,
+                            headerName=col_custo_nome_comp.replace("Total ", "").replace(" (€)", ""),
+                            type=["numericColumn"],
+                            valueFormatter=JsCode("function(params) { if(params.value == null) return '-'; return Number(params.value).toFixed(2); }"),
+                            cellStyle=cell_style_cores_comparativa_js_local,
+                            tooltipValueGetter=tooltip_custo_total_comparativa_js,
+                            tooltipComponent=custom_tooltip_component_js,
+                            minWidth=100, flex=1
+                        )
+            
+            # Ocultar colunas de dados de tooltip que não sejam as de nome/comercializador/tipo ou os totais
+            colunas_de_dados_tooltip_para_comparativa = [
+                col for col in df_resultados_comparacao_aggrid.columns 
+                if col.startswith("Tooltip_Total ")
+            ]
+            for col_ocultar_tooltip_comp in colunas_de_dados_tooltip_para_comparativa:
+                 gb_comp.configure_column(field=col_ocultar_tooltip_comp, hide=True)
+
+
+            gb_comp.configure_grid_options(
+                domLayout='autoHeight',
+                suppressContextMenu=True,
+                tooltipShowDelay=200, # Atraso para mostrar tooltip em ms
+                tooltipMouseTrack=True # Tooltip segue o rato
+            )
+            gridOptions_comp = gb_comp.build()
+            grid_response_comp = AgGrid(
+                df_resultados_comparacao_aggrid,
+                gridOptions=gridOptions_comp,
+                custom_css=custom_css,
+                allow_unsafe_jscode=True,
+                fit_columns_on_grid_load=True,
+                height = min( (len(df_resultados_comparacao_aggrid) + 1) * 40 + 5, 600),
+                theme='alpine',
+                key="aggrid_comparacao_opcoes_final",
+                enable_enterprise_modules=True
+            )
+        st.markdown("<a id='exportar-excel-comparacao'></a>", unsafe_allow_html=True)
+
+        st.markdown("---") # Separador
+        with st.expander("📥 Exportar Tabela de Comparação para Excel"):
+            if not df_resultados_comparacao_aggrid.empty:
+                # Colunas visíveis na AgGrid comparativa por defeito
+                default_cols_export_comp = ['NomeParaExibir']
+                if 'colunas_aggrid_custo_comp' in locals():
+                    default_cols_export_comp.extend(colunas_aggrid_custo_comp)
+
+                # Todas as colunas disponíveis no DataFrame da tabela comparativa
+                all_cols_comp_df = df_resultados_comparacao_aggrid.columns.tolist()
+                
+                # Outras colunas que podem ser úteis para exportar (originalmente ocultas na AgGrid)
+                additional_useful_cols_comp = ['Comercializador', 'Tipo', 'LinkAdesao', 'info_notas']
+                tooltip_data_cols_comp = [col for col in all_cols_comp_df if col.startswith("Tooltip_Total ")]
+                
+                # Construir lista de opções para o multiselect
+                export_options_comp = default_cols_export_comp[:] # Começa com os defaults
+                for col in additional_useful_cols_comp + tooltip_data_cols_comp:
+                    if col in all_cols_comp_df and col not in export_options_comp:
+                        export_options_comp.append(col)
+                # Adicionar restantes colunas se houver alguma que não foi coberta
+                for col in all_cols_comp_df:
+                    if col not in export_options_comp:
+                        export_options_comp.append(col)
+
+                cols_to_export_comp_selected = st.multiselect(
+                    "Selecione as colunas para exportar (Tabela Comparativa):",
+                    options=export_options_comp,
+                    default=default_cols_export_comp,
+                    key="cols_export_excel_comp_selector"
+                )
+
+                # --- Função de interpolação de cores ---
+                def gerar_estilo_completo_para_valor(valor, minimo, maximo):
+                    estilo_css_final = 'text-align: center;' 
+                    if pd.isna(valor): return estilo_css_final
+                    try: val_float = float(valor)
+                    except ValueError: return estilo_css_final
+                    if maximo == minimo or minimo is None or maximo is None: return estilo_css_final
+        
+                    midpoint = (minimo + maximo) / 2
+                    r_bg, g_bg, b_bg = 255,255,255 
+                    verde_rgb, branco_rgb, vermelho_rgb = (99,190,123), (255,255,255), (248,105,107)
+
+                    if val_float <= midpoint:
+                        ratio = (val_float - minimo) / (midpoint - minimo) if midpoint != minimo else 0.0
+                        r_bg = int(verde_rgb[0]*(1-ratio) + branco_rgb[0]*ratio)
+                        g_bg = int(verde_rgb[1]*(1-ratio) + branco_rgb[1]*ratio)
+                        b_bg = int(verde_rgb[2]*(1-ratio) + branco_rgb[2]*ratio)
+                    else:
+                        ratio = (val_float - midpoint) / (maximo - midpoint) if maximo != midpoint else 0.0
+                        r_bg = int(branco_rgb[0]*(1-ratio) + vermelho_rgb[0]*ratio)
+                        g_bg = int(branco_rgb[1]*(1-ratio) + vermelho_rgb[1]*ratio)
+                        b_bg = int(branco_rgb[2]*(1-ratio) + vermelho_rgb[2]*ratio)
+                
+                    estilo_css_final += f' background-color: #{r_bg:02X}{g_bg:02X}{b_bg:02X};'
+                    luminancia = (0.299 * r_bg + 0.587 * g_bg + 0.114 * b_bg)
+                    cor_texto_css = '#000000' if luminancia > 140 else '#FFFFFF'
+                    estilo_css_final += f' color: {cor_texto_css};'
+                    return estilo_css_final
+
+                                        # --- Função de estilo principal a ser aplicada ao DataFrame ---
+                def estilo_geral_dataframe_para_exportar(df_a_aplicar_estilo, tipos_reais_para_estilo_serie, min_max_config_para_cores, nome_coluna_tarifario="Tarifário"):
+                    df_com_estilos = pd.DataFrame('', index=df_a_aplicar_estilo.index, columns=df_a_aplicar_estilo.columns)
+               
+                    # Cores default (pode ajustar)
+                    cor_fundo_indexado_media_css_local = "#FFE699"
+                    cor_texto_indexado_media_css_local = "black"
+                    cor_fundo_indexado_dinamico_css_local = "#4D79BC"  
+                    cor_texto_indexado_dinamico_css_local = "white"
+
+                    for nome_coluna_df in df_a_aplicar_estilo.columns:
+                        # Estilo para colunas de custo (Total (€) na detalhada, Total [Opção] (€) na comparativa)
+                        if nome_coluna_df in min_max_config_para_cores: # min_max_config_para_cores é o min_max_data_X_json_string convertido para dict
+                            try:
+                                serie_valores_col = pd.to_numeric(df_a_aplicar_estilo[nome_coluna_df], errors='coerce')
+                                min_valor_col = min_max_config_para_cores[nome_coluna_df]['min']
+                                max_valor_col = min_max_config_para_cores[nome_coluna_df]['max']
+                                df_com_estilos[nome_coluna_df] = serie_valores_col.apply(
+                                    lambda valor_v: gerar_estilo_completo_para_valor(valor_v, min_valor_col, max_valor_col)
+                                )
+                            except Exception as e_estilo_custo:
+                                print(f"Erro ao aplicar estilo de custo à coluna {nome_coluna_df}: {e_estilo_custo}")
+                                df_com_estilos[nome_coluna_df] = 'text-align: center;' 
+
+                        elif nome_coluna_df == nome_coluna_tarifario: # 'Tarifário' ou 'NomeParaExibir'
+                            estilos_col_tarif_lista = []
+                            for idx_linha_df, valor_nome_col_tarif in df_a_aplicar_estilo[nome_coluna_df].items():
+                                tipo_tarif_str = tipos_reais_para_estilo_serie.get(idx_linha_df, '') if tipos_reais_para_estilo_serie is not None else ''
+        
+                                est_css_tarif = 'text-align: center; padding: 4px;' 
+                                bg_cor_val, fonte_cor_val, fonte_peso_val = "#FFFFFF", "#000000", "normal" # Default Fixo/Outro (branco)
+
+                                if isinstance(valor_nome_col_tarif, str) and valor_nome_col_tarif.startswith("O Meu Tarifário"):
+                                    bg_cor_val, fonte_cor_val, fonte_peso_val = "#FF0000", "#FFFFFF", "bold"
+                                elif tipo_tarif_str == 'Indexado Média':
+                                    bg_cor_val, fonte_cor_val = cor_fundo_indexado_media_css_local, cor_texto_indexado_media_css_local
+                                elif tipo_tarif_str == 'Indexado quarto-horário':
+                                    bg_cor_val, fonte_cor_val = cor_fundo_indexado_dinamico_css_local, cor_texto_indexado_dinamico_css_local
+                                elif tipo_tarif_str == 'Fixo': # Para dar um fundo um pouco diferente aos fixos
+                                    bg_cor_val = "#F0F0F0" 
+                
+                                est_css_tarif += f' background-color: {bg_cor_val}; color: {fonte_cor_val}; font-weight: {fonte_peso_val};'
+                                estilos_col_tarif_lista.append(est_css_tarif)
+                            df_com_estilos[nome_coluna_df] = estilos_col_tarif_lista
+                        else: # Outras colunas de texto ou sem estilização de cor baseada em valor
+                            df_com_estilos[nome_coluna_df] = 'text-align: center;'
+                    return df_com_estilos
+
+
+                def exportar_excel_completo(df_para_exportar, styler_obj, resumo_html_para_excel, poupanca_texto_para_excel, identificador_cor_cabecalho):
+                    output_excel_buffer = io.BytesIO() 
+                    with pd.ExcelWriter(output_excel_buffer, engine='openpyxl') as writer_excel:
+                        sheet_name_excel = 'Tiago Felicia - Eletricidade'
+
+                        # --- Escrever Resumo ---
+                        dados_resumo_formatado = []
+                        if resumo_html_para_excel:
+                            soup_resumo = BeautifulSoup(resumo_html_para_excel, "html.parser")
+                            
+                            # --- LÓGICA ALTERADA PARA REARRANJAR O RESUMO ---
+                            titulo_resumo = soup_resumo.find('h5')
+                            if titulo_resumo:
+                                dados_resumo_formatado.append([titulo_resumo.get_text(strip=True), None])
+
+                            itens_lista_resumo = soup_resumo.find_all('li')
+                            linha_filtros_texto = ""
+                            linha_potencia_texto = ""
+                            outras_linhas_resumo = []
+
+                            for item in itens_lista_resumo:
+                                # Usar .get_text() para obter o conteúdo limpo do item da lista
+                                texto_item = item.get_text(separator=' ', strip=True)
+                                
+                                if "Segmento:" in texto_item:
+                                    linha_filtros_texto = texto_item
+                                elif "kVA" in texto_item:
+                                    linha_potencia_texto = texto_item
+                                else:
+                                    # Processar as outras linhas normalmente
+                                    parts = texto_item.split(':', 1)
+                                    if len(parts) == 2:
+                                        outras_linhas_resumo.append([parts[0].strip() + ":", parts[1].strip()])
+                                    else:
+                                        outras_linhas_resumo.append([texto_item, None])
+                            
+                            # Adicionar a linha combinada primeiro, na ordem que pediu
+                            if linha_filtros_texto or linha_potencia_texto:
+                                dados_resumo_formatado.append([linha_filtros_texto, linha_potencia_texto])
+                            
+                            # Adicionar o resto do resumo
+                            dados_resumo_formatado.extend(outras_linhas_resumo)
+                            # --- FIM DA LÓGICA ALTERADA ---
+        
+                        df_resumo_obj = pd.DataFrame(dados_resumo_formatado)
+
+                        # 1. Deixe o Pandas criar/ativar a folha na primeira escrita
+                        df_resumo_obj.to_excel(writer_excel, sheet_name=sheet_name_excel, index=False, header=False, startrow=0)
+
+                        # 2. AGORA obtenha a referência à worksheet, que certamente existe
+                        worksheet_excel = writer_excel.sheets[sheet_name_excel]
+
+
+                        # Formatar Resumo (Negrito)
+                        bold_font_obj = Font(bold=True) # Font já deve estar importado de openpyxl.styles
+                        for i_resumo in range(len(df_resumo_obj)):
+                            excel_row_idx_resumo = i_resumo + 1 # Linhas do Excel são 1-based
+                            cell_resumo_rotulo = worksheet_excel.cell(row=excel_row_idx_resumo, column=1)
+                            cell_resumo_rotulo.font = bold_font_obj
+                            if df_resumo_obj.shape[1] > 1 and pd.notna(df_resumo_obj.iloc[i_resumo, 1]):
+                                cell_resumo_valor = worksheet_excel.cell(row=excel_row_idx_resumo, column=2)
+                                cell_resumo_valor.font = bold_font_obj
+
+                        worksheet_excel.column_dimensions['A'].width = 35
+                        worksheet_excel.column_dimensions['B'].width = 65
+
+                        linha_atual_no_excel_escrita = len(df_resumo_obj) + 1
+
+                        # --- Escrever Mensagem de Poupança ---
+                        if poupanca_texto_para_excel: # Verifica se há texto para a mensagem de poupança
+                            linha_atual_no_excel_escrita += 1 # Adiciona uma linha em branco
+
+                            cor_p = st.session_state.get('poupanca_excel_cor', "000000") # Cor do session_state
+                            negrito_p = st.session_state.get('poupanca_excel_negrito', False) # Negrito do session_state
+            
+                            poupanca_cell_escrita = worksheet_excel.cell(row=linha_atual_no_excel_escrita, column=1, value=poupanca_texto_para_excel)
+                            poupanca_font_escrita = Font(bold=negrito_p, color=cor_p)
+                            poupanca_cell_escrita.font = poupanca_font_escrita
+
+                            # --- MODIFICAÇÃO PARA JUNTAR CÉLULAS ---
+                            worksheet_excel.merge_cells(start_row=linha_atual_no_excel_escrita, start_column=1, end_row=linha_atual_no_excel_escrita, end_column=6)
+
+                            # Aplicar alinhamento à célula mesclada (a célula do canto superior esquerdo, poupanca_cell_escrita)
+                            poupanca_cell_escrita.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top')
+
+                            linha_atual_no_excel_escrita += 1 # Avança para a próxima linha após a mensagem de poupança
+        
+                        linha_inicio_tab_dados_excel = linha_atual_no_excel_escrita + 3
+
+                        # --- Adicionar linha de informação da simulação ---
+                        # Adiciona uma linha em branco antes desta nova linha de informação
+                        linha_info_simulacao_excel = linha_atual_no_excel_escrita + 1 
+
+                        data_hoje_obj = datetime.date.today() # datetime já deve estar importado
+                        data_hoje_formatada_str = data_hoje_obj.strftime('%d/%m/%Y')
+
+                        espacador_info = "                                                                      " #: 70 espaços
+
+                        texto_completo_info = (
+                            f"          Simulação em {data_hoje_formatada_str}{espacador_info}"
+                            f"https://www.tiagofelicia.pt{espacador_info}"
+                            f"Tiago Felícia"
+                        )
+
+                        # Escrever o texto completo na primeira célula da área a ser mesclada (Coluna A)
+                        info_cell = worksheet_excel.cell(row=linha_info_simulacao_excel, column=1)
+                        info_cell.value = texto_completo_info
+            
+                        # Aplicar negrito à célula
+                        # Reutilizar bold_font_obj que já foi definido para o resumo, ou criar um novo se precisar de formatação diferente.
+                        # Assumindo que bold_font_obj é Font(bold=True) e está no escopo.
+                        # Se não, defina-o: from openpyxl.styles import Font; bold_font_obj = Font(bold=True)
+                        if 'bold_font_obj' in locals() or 'bold_font_obj' in globals():
+                             info_cell.font = bold_font_obj # Reutiliza o bold_font_obj do resumo
+                        else:
+                             info_cell.font = Font(bold=True) # Cria um novo se não existir
+
+                        # Mesclar as colunas A, B, C, e D para esta linha
+                        worksheet_excel.merge_cells(start_row=linha_info_simulacao_excel, start_column=1, end_row=linha_info_simulacao_excel, end_column=6)
+
+                        # Ajustar alinhamento da célula mesclada (info_cell é a célula do topo-esquerda da área mesclada)
+                        # Alinhado à esquerda, centralizado verticalmente, com quebra de linha se necessário.
+                        info_cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True) 
+
+                        # A linha de início para a tabela de dados principal virá depois desta linha de informação
+                        # Adicionamos +1 para esta linha de informação e +1 para uma linha em branco antes da tabela
+                        linha_inicio_tab_dados = linha_info_simulacao_excel + 2 
+            
+                        # --- Fim da adição da linha de informação ---
+
+                        for row in worksheet_excel.iter_rows(min_row=1, max_row=worksheet_excel.max_row+100, min_col=1, max_col=20):
+                            for cell in row:
+                                cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+
+                        # O Styler escreverá na mesma folha 'sheet_name_excel'
+                        styler_obj.to_excel(
+                            writer_excel,
+                            sheet_name=sheet_name_excel,
+                            index=False,
+                            startrow=linha_inicio_tab_dados_excel - 1, # startrow é 0-indexed
+                            columns=df_para_exportar.columns.tolist()
+                        )
+
+                        # Determina cor do cabeçalho conforme a opção horária e ciclo
+                        opcao_horaria_lower = str(opcao_horaria).lower() if 'opcao_horaria' in locals() else "simples"
+                        cor_fundo = "A6A6A6"   # padrão Simples
+                        cor_fonte = "000000"    # padrão preto
+
+                        if isinstance(identificador_cor_cabecalho, str):
+                            id_lower = identificador_cor_cabecalho.lower()
+                            if id_lower == "simples": # Já coberto pelo default
+                                pass
+                            elif "bi-horário" in id_lower and "diário" in id_lower:
+                                cor_fundo = "A9D08E"; cor_fonte = "000000"
+                            elif "bi-horário" in id_lower and "semanal" in id_lower:
+                                cor_fundo = "8EA9DB"; cor_fonte = "000000"
+                            elif "tri-horário" in id_lower and "diário" in id_lower:
+                                cor_fundo = "BF8F00"; cor_fonte = "FFFFFF"
+                            elif "tri-horário" in id_lower and "semanal" in id_lower:
+                                cor_fundo = "C65911"; cor_fonte = "FFFFFF"
+
+                        # linha_inicio_tab_dados_excel já existe na função e corresponde ao header da tabela
+                        for col_idx, _ in enumerate(df_para_exportar.columns):
+                            celula = worksheet_excel.cell(row=linha_inicio_tab_dados_excel, column=col_idx + 1)
+                            celula.fill = PatternFill(start_color=cor_fundo, end_color=cor_fundo, fill_type="solid")
+                            celula.font = Font(color=cor_fonte, bold=True)
+
+                                # ---- INÍCIO: ADICIONAR LEGENDA DE CORES APÓS A TABELA ----
+                        # Calcular a linha de início para a legenda
+                        # df_para_exportar é o DataFrame que foi escrito pelo styler (ex: df_export_final)
+                        numero_linhas_dados_tabela_principal = len(df_para_exportar)
+                        # linha_inicio_tab_dados_excel é a linha do cabeçalho da tabela principal (1-indexada)
+                        ultima_linha_tabela_principal = linha_inicio_tab_dados_excel + numero_linhas_dados_tabela_principal
+                    
+                        linha_legenda_bloco_inicio = ultima_linha_tabela_principal + 2 # Deixa uma linha em branco após a tabela
+
+                        # Título da Legenda
+                        titulo_legenda_cell = worksheet_excel.cell(row=linha_legenda_bloco_inicio, column=1, value="Tipos de Tarifário:")
+                        # Reutilizar bold_font_obj se definido ou criar um novo
+                        if 'bold_font_obj' in locals() or 'bold_font_obj' in globals():
+                            titulo_legenda_cell.font = bold_font_obj
+                        else:
+                            titulo_legenda_cell.font = Font(bold=True)
+                        worksheet_excel.merge_cells(start_row=linha_legenda_bloco_inicio, start_column=1, end_row=linha_legenda_bloco_inicio, end_column=6) # Mesclar para o título
+
+                        linha_legenda_item_atual = linha_legenda_bloco_inicio + 1 # Primeira linha para item da legenda
+
+                        titulo_legenda_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+                        itens_legenda_excel = [
+                            {"cf": "FF0000", "ct": "FFFFFF", "b": True, "tA": "O Meu Tarifário", "tB": "Tarifário configurado pelo utilizador."},
+                            {"cf": "FFE699", "ct": "000000", "b": False, "tA": "Indexado (Média)", "tB": "Preço de energia baseado na média OMIE do período."},
+                            {"cf": "4D79BC", "ct": "FFFFFF", "b": False, "tA": "Indexado (Quarto-Horário)", "tB": "Preço de energia baseado nos valores OMIE horários/quarto-horários e perfil."},
+                            {"cf": "F0F0F0", "ct": "333333", "b": False, "tA": "Fixo", "tB": "Preços de energia constantes", "borda_cor": "CCCCCC"}
+                        ]
+                    
+                        # Definir larguras das colunas para a legenda (pode ajustar conforme necessário)
+                        worksheet_excel.column_dimensions[get_column_letter(1)].width = 30 # Coluna A para a amostra/nome
+                        worksheet_excel.column_dimensions[get_column_letter(2)].width = 200 # Coluna B para a descrição (será junta)
+
+                        for item in itens_legenda_excel:
+                            celula_A_legenda = worksheet_excel.cell(row=linha_legenda_item_atual, column=1, value=item["tA"])
+                            celula_A_legenda.fill = PatternFill(start_color=item["cf"], end_color=item["cf"], fill_type="solid")
+                            celula_A_legenda.font = Font(color=item["ct"], bold=item["b"])
+                            celula_A_legenda.alignment = Alignment(horizontal='center', vertical='center', indent=1)
+
+                            if "borda_cor" in item:
+                                cor_borda_hex = item["borda_cor"]
+                                borda_legenda_obj = Border(
+                                    top=Side(border_style="thin", color=cor_borda_hex),
+                                    left=Side(border_style="thin", color=cor_borda_hex),
+                                    right=Side(border_style="thin", color=cor_borda_hex),
+                                    bottom=Side(border_style="thin", color=cor_borda_hex)
+                                )
+                                celula_A_legenda.border = borda_legenda_obj
+                        
+                            celula_B_legenda = worksheet_excel.cell(row=linha_legenda_item_atual, column=2, value=item["tB"])
+                            celula_B_legenda.alignment = Alignment(vertical='center', wrap_text=True, horizontal='left')
+                            # Mesclar colunas B até D (ou ajuste conforme a largura desejada para a descrição)
+                            worksheet_excel.merge_cells(start_row=linha_legenda_item_atual, start_column=2,
+                                                        end_row=linha_legenda_item_atual, end_column=6) 
+                        
+                            worksheet_excel.row_dimensions[linha_legenda_item_atual].height = 20 # Ajustar altura da linha da legenda
+                            linha_legenda_item_atual += 1
+                        # ---- FIM: ADICIONAR LEGENDA DE CORES ----
+
+                        # Ajustar largura das colunas da tabela principal
+                        for col_idx_iter, col_nome_iter_width in enumerate(df_para_exportar.columns):
+                            col_letra_iter = get_column_letter(col_idx_iter + 1) # get_column_letter já deve estar importado
+                            if "Tarifário" in col_nome_iter_width :
+                                 worksheet_excel.column_dimensions[col_letra_iter].width = 80    
+                            elif "Total Simples (€)" == col_nome_iter_width :
+                                worksheet_excel.column_dimensions[col_letra_iter].width = 33
+                            elif "Total Bi-horário - Ciclo Diário (€)" in col_nome_iter_width :
+                                worksheet_excel.column_dimensions[col_letra_iter].width = 33
+                            elif "Total Bi-horário - Ciclo Semanal (€)" in col_nome_iter_width :
+                                 worksheet_excel.column_dimensions[col_letra_iter].width = 33    
+                            elif "Total Tri-horário - Ciclo Diário (€)" in col_nome_iter_width :
+                             worksheet_excel.column_dimensions[col_letra_iter].width = 33    
+                            elif "Total Tri-horário - Ciclo Semanal (€)" in col_nome_iter_width :
+                                 worksheet_excel.column_dimensions[col_letra_iter].width = 33    
+                            else: 
+                                worksheet_excel.column_dimensions[col_letra_iter].width = 25
+
+
+                    output_excel_buffer.seek(0)
+                    return output_excel_buffer
+                        # --- Fim da definição de exportar_excel_completo ---
+
+
+
+                limit_export_comp_selected = st.selectbox(
+                    "Número de tarifários a exportar (Tabela Comparativa):",
+                    options=["Todos"] + [f"Top {i}" for i in [10, 20, 30, 40, 50]],
+                    index=0,
+                    key="limit_export_excel_comp"
+                )
+
+                if st.button("Preparar Download Excel (Tabela Comparativa)", key="btn_prep_excel_comp_final"):
+                    if not cols_to_export_comp_selected:
+                        st.warning("Por favor, selecione pelo menos uma coluna para exportar.")
+                    else:
+                        with st.spinner("A gerar ficheiro Excel da Tabela Comparativa..."):
+                            
+                            df_data_from_grid_comp = pd.DataFrame()
+                            if 'grid_response_comp' in locals() and grid_response_comp and grid_response_comp['data'] is not None:
+                                df_data_from_grid_comp = pd.DataFrame(grid_response_comp['data'])
+                            else:
+                                st.warning("Não foi possível obter os dados da grelha. A exportar com base na tabela original.")
+                                df_data_from_grid_comp = df_resultados_comparacao_aggrid.copy()
+
+                            if not df_data_from_grid_comp.empty:
+                                
+                                tipos_reais_para_estilo_comp = df_data_from_grid_comp['Tipo'] if 'Tipo' in df_data_from_grid_comp else pd.Series(dtype=str)
+
+                                min_max_config_excel = {}
+                                colunas_custo_para_cor = [col for col in df_data_from_grid_comp.columns if col.startswith("Total ")]
+                                for col_custo in colunas_custo_para_cor:
+                                    serie = pd.to_numeric(df_data_from_grid_comp[col_custo], errors='coerce').dropna()
+                                    if not serie.empty:
+                                        min_max_config_excel[col_custo] = {'min': serie.min(), 'max': serie.max()}
+                                    else:
+                                        min_max_config_excel[col_custo] = {'min': 0, 'max': 0}
+
+                                valid_export_cols_comp = [col for col in cols_to_export_comp_selected if col in df_data_from_grid_comp.columns]
+                                if valid_export_cols_comp:
+                                    df_export_comp_final = df_data_from_grid_comp[valid_export_cols_comp].copy()
+                                else:
+                                    st.warning("Nenhuma das colunas selecionadas para exportação está presente nos dados atuais da tabela comparativa.")
+                                    df_export_comp_final = pd.DataFrame()
+                                
+                                if not df_export_comp_final.empty and limit_export_comp_selected != "Todos":
+                                    try:
+                                        num_to_export_comp = int(limit_export_comp_selected.split(" ")[1])
+                                        df_export_comp_final = df_export_comp_final.head(num_to_export_comp)
+                                        tipos_reais_para_estilo_comp = tipos_reais_para_estilo_comp.head(num_to_export_comp)
+                                    except Exception as e:
+                                        st.warning(f"Não foi possível aplicar o limite de tarifários à tabela comparativa: {e}")
+                                
+                                if not df_export_comp_final.empty:
+                                    if 'NomeParaExibir' in df_export_comp_final.columns:
+                                        df_export_comp_final.rename(columns={'NomeParaExibir': 'Tarifário'}, inplace=True)
+
+                                    # --- MUDANÇA PRINCIPAL AQUI: Arredondar os dados diretamente no DataFrame ---
+                                    for col in df_export_comp_final.columns:
+                                        if "(€)" in col:
+                                            # Garante que a coluna é numérica antes de arredondar
+                                            df_export_comp_final[col] = pd.to_numeric(df_export_comp_final[col], errors='coerce').round(2)
+                                    
+                                    styler_comp_excel = df_export_comp_final.style.apply(
+                                        lambda df: estilo_geral_dataframe_para_exportar(df, tipos_reais_para_estilo_comp, min_max_config_excel, "Tarifário"),
+                                        axis=None
+                                    )
+                                    
+                                    # O .format() já não é estritamente necessário para o arredondamento, mas podemos mantê-lo para formatação (ex: na_rep)
+                                    styler_comp_excel = styler_comp_excel.format(formatter="{:.2f}", na_rep="-")
+                                    
+                                    styler_comp_excel = styler_comp_excel.set_table_styles([
+                                        {'selector': 'th', 'props': [('background-color', '#404040'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center'), ('border', '1px solid black'), ('padding', '5px')]},
+                                        {'selector': 'td', 'props': [('border', '1px solid #dddddd'), ('padding', '4px')]}
+                                    ]).hide(axis="index")
+
+                                    output_excel_comp_bytes = exportar_excel_completo(
+                                        df_export_comp_final,
+                                        styler_comp_excel,
+                                        html_resumo_final,
+                                        st.session_state.get('poupanca_excel_texto', ""),
+                                        "Comparativa"
+                                    )
+
+                                    timestamp_comp_dl = int(time.time())
+                                    filename_comp = f"Tiago_Felicia_Eletricidade_Comparacao_{timestamp_comp_dl}.xlsx"
+                                    
+                                    st.download_button(
+                                        label=f"📥 Descarregar Excel ({filename_comp})",
+                                        data=output_excel_comp_bytes.getvalue(),
+                                        file_name=filename_comp,
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"btn_dl_excel_comp_{timestamp_comp_dl}"
+                                    )
+                                    st.success(f"{filename_comp} pronto para download!")
+                                elif df_export_comp_final.empty and not cols_to_export_comp_selected:
+                                   pass
+                                else:
+                                    st.warning("Nenhum dado para exportar com os filtros e colunas selecionados para a tabela comparativa.")
+                            else:
+                                st.info("Tabela comparativa está vazia, nada para exportar.")
+    st.markdown("---")
+
+        # --- FIM DO EXPANDER DE EXPORTAÇÃO DA TABELA COMPARATIVA ---
+
+# --- INÍCIO DO BLOCO PARA TABELA DETALHADA (AgGrid Principal) ---
+
 # --- Comparar Tarifários Fixos ---
-tarifarios_filtrados_fixos = tarifarios_fixos[
-    (tarifarios_fixos['opcao_horaria_e_ciclo'] == opcao_horaria) &
-    (tarifarios_fixos['potencia_kva'] == potencia)
+tarifarios_filtrados_fixos = tf_processar[
+    (tf_processar['opcao_horaria_e_ciclo'] == opcao_horaria) &
+    (tf_processar['potencia_kva'] == potencia)
 ].copy()
 
 if not tarifarios_filtrados_fixos.empty:
@@ -1893,9 +4212,9 @@ if comparar_indexados:
     if df_omie_ajustado.empty:
         st.warning("Não existem dados OMIE para o período selecionado. Tarifários indexados não podem ser calculados.")
     else:
-        tarifarios_filtrados_indexados = tarifarios_indexados[
-            (tarifarios_indexados['opcao_horaria_e_ciclo'] == opcao_horaria) &
-            (tarifarios_indexados['potencia_kva'] == potencia)
+        tarifarios_filtrados_indexados = ti_processar[
+            (ti_processar['opcao_horaria_e_ciclo'] == opcao_horaria) &
+            (ti_processar['potencia_kva'] == potencia)
         ].copy()
 
     # Usar a estrutura simplificada do if/else
@@ -2005,16 +4324,16 @@ if comparar_indexados:
 
                             calculo_instantaneo_sem_perfil = 0.0
                             # --- Fórmulas específicas BTN ---
-                            if nome_tarifario == "Coopérnico Base 2.0": calculo_instantaneo_sem_perfil = (omie + constantes.get('Coop_CS_CR', 0.01) + constantes.get('Coop_K', 0.009)) * perdas
-                            elif nome_tarifario == "Repsol - Leve Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 1.03) + constantes.get('Repsol_Q_Tarifa', 0.01479))
-                            elif nome_tarifario == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 1.03) + constantes.get('Repsol_Q_Tarifa_Pro', 0.01359))
-                            elif nome_tarifario == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil = (omie + constantes.get('Galp_Ci', 0.0159)) * perdas
+                            if nome_tarifario == "Coopérnico Base 2.0": calculo_instantaneo_sem_perfil = (omie + constantes.get('Coop_CS_CR', 0.0) + constantes.get('Coop_K', 0.0)) * perdas
+                            elif nome_tarifario == "Repsol - Leve Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 0.0) + constantes.get('Repsol_Q_Tarifa', 0.0))
+                            elif nome_tarifario == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 0.0) + constantes.get('Repsol_Q_Tarifa_Pro', 0.0))
+                            elif nome_tarifario == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil = (omie + constantes.get('Galp_Ci', 0.0)) * perdas
                             elif nome_tarifario == "Alfa Energia - ALFA POWER INDEX BTN": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Alfa_CGS', 0.0)) * perdas + constantes.get('Alfa_K', 0.0))
-                            elif nome_tarifario == "Plenitude - Tendência - Há Cashback 30 €": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0)) * perdas + constantes.get('Plenitude_Fee', 0.0))
+                            elif nome_tarifario == "Plenitude - Tendência - Há Cashback 30 €": calculo_instantaneo_sem_perfil = (((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0))) * perdas + constantes.get('Plenitude_Fee', 0.0))
                             elif nome_tarifario == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil = (omie + constantes.get('Meo_K', 0.0)) * perdas
                             elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
                             elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
-                            elif nome_tarifario == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil = (omie * constantes.get('G9_FA', 1.02) * perdas + constantes.get('G9_CGS', 0.0) + constantes.get('G9_AC', 0.0))
+                            elif nome_tarifario == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil = (omie * constantes.get('G9_FA', 0.0) * perdas + constantes.get('G9_CGS', 0.0) + constantes.get('G9_AC', 0.0))
                             elif nome_tarifario == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil = (omie * perdas + constantes.get("Iberdrola_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0))
 
 
@@ -2428,102 +4747,21 @@ if comparar_indexados:
                 resultados_list.append(resultado_indexado)
 # --- Fim do loop for tarifario_indexado ---
 
-    else: # Se tarifarios_filtrados_indexados estiver vazio
-        if comparar_indexados: # Apenas mostra mensagem se a checkbox estiver marcada
-            st.info("Não foram encontrados tarifários indexados para as opções selecionadas.")
-
 # --- Fim do if comparar_indexados ---
 
-
 # --- Processamento final e exibição da tabela de resultados ---
-st.markdown("---")
-st.subheader("💰 Tiago Felícia - Tarifários de Eletricidade")
-
-# --- Construir Resumo dos Inputs para Exibição ---
-cor_texto_resumo = "#333333"  # Um cinza escuro, bom para fundos claros
-
-resumo_html_parts = [
-    # Adicionar 'color: cor_texto_resumo;' ao estilo do div principal
-    f"<div style='background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 6px; margin-bottom: 25px; color: {cor_texto_resumo};'>"
-]
-resumo_html_parts.append(f"<h5 style='margin-top:0; color: {cor_texto_resumo};'>Resumo da Simulação:</h5>")
-resumo_html_parts.append("<ul style='list-style-type: none; padding-left: 0;'>")
+st.subheader("💰 Tiago Felícia - Tarifários de Eletricidade - Detalhado")
 
 
-# 1. Potência contratada + Opção Horária e Ciclo
-resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>{potencia} kVA</b> em <b>{opcao_horaria}</b></li>")
-
-# 2. Consumo dividido por opção
-consumo_detalhe_str = ""
-if opcao_horaria.lower() == "simples":
-    consumo_detalhe_str = f"Simples: {consumo_simples:.0f} kWh"
-elif opcao_horaria.lower().startswith("bi"):
-    consumo_detalhe_str = f"Vazio: {consumo_vazio:.0f} kWh, Fora Vazio: {consumo_fora_vazio:.0f} kWh"
-elif opcao_horaria.lower().startswith("tri"):
-    consumo_detalhe_str = f"Vazio: {consumo_vazio:.0f} kWh, Cheias: {consumo_cheias:.0f} kWh, Ponta: {consumo_ponta:.0f} kWh"
-resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Consumos ({consumo:.0f} kWh Total):</b> {consumo_detalhe_str}</li>")
-
-# 3. Datas e Dias Faturados
-# 'dias_default_calculado' e 'dias' já foram calculados
-# 'dias_manual_input_val' é o valor do widget st.number_input para dias manuais
-dias_manual_valor_do_input = st.session_state.get('dias_manual_input_key', dias_default_calculado) # Use a key correta do seu input
-usou_dias_manuais_efetivamente = False
-if pd.notna(dias_manual_valor_do_input) and dias_manual_valor_do_input > 0 and \
-   int(dias_manual_valor_do_input) != dias_default_calculado:
-    usou_dias_manuais_efetivamente = True
-
-if usou_dias_manuais_efetivamente:
-    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Período:</b> {dias} dias (definido manualmente)</li>")
-else:
-    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Período:</b> De {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')} ({dias} dias)</li>")
-
-# 4. Valores OMIE da opção escolhida, com a referência
-omie_valores_str_parts = []
-if opcao_horaria.lower() == "simples":
-    val_s = st.session_state.get('omie_s_input_field', round(omie_medios_calculados.get('S',0), 2))
-    omie_valores_str_parts.append(f"Simples: {val_s:.2f} €/MWh")
-elif opcao_horaria.lower().startswith("bi"):
-    val_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2))
-    val_f = st.session_state.get('omie_f_input_field', round(omie_medios_calculados.get('F',0), 2))
-    omie_valores_str_parts.append(f"Vazio: {val_v:.2f} €/MWh")
-    omie_valores_str_parts.append(f"Fora Vazio: {val_f:.2f} €/MWh")
-elif opcao_horaria.lower().startswith("tri"):
-    val_v = st.session_state.get('omie_v_input_field', round(omie_medios_calculados.get('V',0), 2))
-    val_c = st.session_state.get('omie_c_input_field', round(omie_medios_calculados.get('C',0), 2))
-    val_p = st.session_state.get('omie_p_input_field', round(omie_medios_calculados.get('P',0), 2))
-    omie_valores_str_parts.append(f"Vazio: {val_v:.2f} €/MWh")
-    omie_valores_str_parts.append(f"Cheias: {val_c:.2f} €/MWh")
-    omie_valores_str_parts.append(f"Ponta: {val_p:.2f} €/MWh")
-
-if omie_valores_str_parts: # Só mostra a secção OMIE se houver valores a exibir
-    resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>OMIE {nota_omie}:</b> {', '.join(omie_valores_str_parts)}</li>")
-
-# 5. Perfil de consumo utilizado
-perfil_consumo_calculado_str = obter_perfil(consumo, dias, potencia) # Chamar a sua função
-# Formatar para uma apresentação mais amigável
-texto_perfil_apresentacao = perfil_consumo_calculado_str.replace("perfil_", "Perfil ").upper() # Ex: "Perfil A"
-resumo_html_parts.append(f"<li style='margin-bottom: 5px;'><b>Perfil de Consumo:</b> {texto_perfil_apresentacao}</li>")
-
-# 6. Tarifa Social (se ativa)
-if tarifa_social:
-    resumo_html_parts.append(f"<li style='margin-bottom: 5px; color: red;'><b>Benefício Aplicado:</b> Tarifa Social</li>")
-
-# 7. Família Numerosa (se ativa)
-if familia_numerosa:
-    resumo_html_parts.append(f"<li style='margin-bottom: 5px; color: red;'><b>Benefício Aplicado:</b> Família Numerosa</li>")
-
-resumo_html_parts.append("</ul>")
-resumo_html_parts.append("</div>")
-html_resumo_final = "".join(resumo_html_parts)
-
-# Exibir o resumo
-st.markdown(html_resumo_final, unsafe_allow_html=True)
-
-vista_simplificada = st.checkbox("📱 Ativar vista simplificada (ideal em ecrãs menores)", key="chk_vista_simplificada")
+vista_simplificada = st.checkbox(
+    "📱 Ativar vista simplificada (ideal em ecrãs menores)",
+    value=True,
+    key="chk_vista_simplificada"
+    )
 
 st.write("Total com todos os componentes, taxas e impostos e Valores unitários sem IVA")
 
-st.markdown("➡️ [**Exportar Tabela para Excel**](#exportar-excel-ancora)")
+st.markdown("➡️ [**Exportar Tabela Detalhada para Excel**](#exportar-excel-detalhada)")
 
 # Verifica se "O Meu Tarifário" deve ser incluído
 final_results_list = resultados_list.copy() # Começa com os tarifários fixos e/ou indexados
@@ -2630,7 +4868,7 @@ except Exception as e_poupanca: # Renomeado para e_poupanca_ui para evitar confl
 #ATENÇÃO, PODE CAUSAR PROBLEMAS
 st.empty()
 import time
-time.sleep(0.1) # Geralmente uma má ideia em apps Streamlit
+time.sleep(0.2) # Geralmente uma má ideia em apps Streamlit
 
 if not df_resultados.empty:
     if vista_simplificada:
@@ -3654,9 +5892,9 @@ if not df_resultados.empty:
         )
         # ---- FIM DA CONFIGURAÇÃO DO AGGRID ----
 
-    st.markdown("<a id='exportar-excel-ancora'></a>", unsafe_allow_html=True)
+    st.markdown("<a id='exportar-excel-detalhada'></a>", unsafe_allow_html=True)
     st.markdown("---")
-    with st.expander("📥 Exportar Tabela para Excel"):
+    with st.expander("📥 Exportar Tabela Detalhada para Excel"):
         colunas_dados_tooltip_a_ocultar = [
             'info_notas', 'LinkAdesao',
             'tooltip_pot_comerc_sem_tar', 'tooltip_pot_tar_bruta', # ... e todas as outras ...
@@ -3716,8 +5954,8 @@ if not df_resultados.empty:
                 key="cols_export_excel_selector_dados_com_tooltips" # Nova key
             )
             
-            def exportar_excel_completo(df_para_exportar, styler_obj, resumo_html_para_excel, poupanca_texto_para_excel, opcao_horaria):
-                output_excel_buffer = io.BytesIO() # io deve estar importado
+            def exportar_excel_completo(df_para_exportar, styler_obj, resumo_html_para_excel, poupanca_texto_para_excel, identificador_cor_cabecalho):
+                output_excel_buffer = io.BytesIO() 
                 with pd.ExcelWriter(output_excel_buffer, engine='openpyxl') as writer_excel:
                     sheet_name_excel = 'Tiago Felicia - Eletricidade'
 
@@ -3725,31 +5963,48 @@ if not df_resultados.empty:
                     dados_resumo_formatado = []
                     if resumo_html_para_excel:
                         soup_resumo = BeautifulSoup(resumo_html_para_excel, "html.parser")
+                        
+                        # --- LÓGICA ALTERADA PARA REARRANJAR O RESUMO ---
                         titulo_resumo = soup_resumo.find('h5')
                         if titulo_resumo:
-                            dados_resumo_formatado.append([titulo_resumo.get_text(strip=True), None]) # Adiciona título do resumo
-            
+                            dados_resumo_formatado.append([titulo_resumo.get_text(strip=True), None])
+
                         itens_lista_resumo = soup_resumo.find_all('li')
-                        if itens_lista_resumo:
-                            for item_resumo in itens_lista_resumo:
-                                text_content_resumo = item_resumo.get_text(separator=' ', strip=True)
-                                # Tenta manter a estrutura de "Rótulo: Valor" se possível
-                                parts_resumo = text_content_resumo.split(':', 1)
-                                if len(parts_resumo) == 2:
-                                    dados_resumo_formatado.append([parts_resumo[0].strip() + ":", parts_resumo[1].strip()])
+                        linha_filtros_texto = ""
+                        linha_potencia_texto = ""
+                        outras_linhas_resumo = []
+
+                        for item in itens_lista_resumo:
+                            # Usar .get_text() para obter o conteúdo limpo do item da lista
+                            texto_item = item.get_text(separator=' ', strip=True)
+                                
+                            if "Segmento:" in texto_item:
+                                linha_filtros_texto = texto_item
+                            elif "kVA" in texto_item:
+                                linha_potencia_texto = texto_item
+                            else:
+                                # Processar as outras linhas normalmente
+                                parts = texto_item.split(':', 1)
+                                if len(parts) == 2:
+                                    outras_linhas_resumo.append([parts[0].strip() + ":", parts[1].strip()])
                                 else:
-                                    dados_resumo_formatado.append([text_content_resumo, None]) # Se não tiver ':', põe tudo na primeira coluna
-                        elif not titulo_resumo and soup_resumo.get_text(strip=True): # Fallback se não houver h5 nem li, mas houver texto
-                             dados_resumo_formatado.append(["Resumo:", soup_resumo.get_text(separator=" ", strip=True)])
+                                    outras_linhas_resumo.append([texto_item, None])
+                            
+                        # Adicionar a linha combinada primeiro, na ordem que pediu
+                        if linha_filtros_texto or linha_potencia_texto:
+                            dados_resumo_formatado.append([linha_filtros_texto, linha_potencia_texto])
+                        
+                        # Adicionar o resto do resumo
+                        dados_resumo_formatado.extend(outras_linhas_resumo)
+                        # --- FIM DA LÓGICA ALTERADA ---
         
                     df_resumo_obj = pd.DataFrame(dados_resumo_formatado)
-                    
+
                     # 1. Deixe o Pandas criar/ativar a folha na primeira escrita
                     df_resumo_obj.to_excel(writer_excel, sheet_name=sheet_name_excel, index=False, header=False, startrow=0)
 
                     # 2. AGORA obtenha a referência à worksheet, que certamente existe
                     worksheet_excel = writer_excel.sheets[sheet_name_excel]
-                    # workbook_excel = writer_excel.book # Se precisar do workbook para algo mais
 
                     # Formatar Resumo (Negrito)
                     bold_font_obj = Font(bold=True) # Font já deve estar importado de openpyxl.styles
@@ -3846,21 +6101,18 @@ if not df_resultados.empty:
                     cor_fundo = "A6A6A6"   # padrão Simples
                     cor_fonte = "000000"    # padrão preto
 
-                    if opcao_horaria_lower == "simples":
-                        cor_fundo = "A6A6A6"
-                        cor_fonte = "000000"
-                    elif "bi-horário" in opcao_horaria_lower and "diário" in opcao_horaria_lower:
-                        cor_fundo = "A9D08E"
-                        cor_fonte = "000000"
-                    elif "bi-horário" in opcao_horaria_lower and "semanal" in opcao_horaria_lower:
-                        cor_fundo = "8EA9DB"
-                        cor_fonte = "000000"
-                    elif "tri-horário" in opcao_horaria_lower and "diário" in opcao_horaria_lower:
-                        cor_fundo = "BF8F00"
-                        cor_fonte = "FFFFFF"
-                    elif "tri-horário" in opcao_horaria_lower and "semanal" in opcao_horaria_lower:
-                        cor_fundo = "C65911"
-                        cor_fonte = "FFFFFF"
+                    if isinstance(identificador_cor_cabecalho, str):
+                        id_lower = identificador_cor_cabecalho.lower()
+                        if id_lower == "simples": # Já coberto pelo default
+                            pass
+                        elif "bi-horário" in id_lower and "diário" in id_lower:
+                            cor_fundo = "A9D08E"; cor_fonte = "000000"
+                        elif "bi-horário" in id_lower and "semanal" in id_lower:
+                            cor_fundo = "8EA9DB"; cor_fonte = "000000"
+                        elif "tri-horário" in id_lower and "diário" in id_lower:
+                            cor_fundo = "BF8F00"; cor_fonte = "FFFFFF"
+                        elif "tri-horário" in id_lower and "semanal" in id_lower:
+                            cor_fundo = "C65911"; cor_fonte = "FFFFFF"
 
                     # linha_inicio_tab_dados_excel já existe na função e corresponde ao header da tabela
                     for col_idx, _ in enumerate(df_para_exportar.columns):
@@ -4066,48 +6318,59 @@ if not df_resultados.empty:
 
 
                         # --- Função de estilo principal a ser aplicada ao DataFrame ---
-                        def estilo_geral_dataframe_para_exportar(df_a_aplicar_estilo): # df_a_aplicar_estilo é df_export_final
+                        def estilo_geral_dataframe_para_exportar(df_a_aplicar_estilo, tipos_reais_para_estilo_serie, min_max_config_para_cores, nome_coluna_tarifario="Tarifário"):
                             df_com_estilos = pd.DataFrame('', index=df_a_aplicar_estilo.index, columns=df_a_aplicar_estilo.columns)
-                
-                            # 'tipos_reais_para_estilo' está acessível aqui devido ao escopo Python (closure)
+               
+                            # Cores default (pode ajustar)
+                            cor_fundo_indexado_media_css_local = "#FFE699"
+                            cor_texto_indexado_media_css_local = "black"
+                            cor_fundo_indexado_dinamico_css_local = "#4D79BC"  
+                            cor_texto_indexado_dinamico_css_local = "white"
 
                             for nome_coluna_df in df_a_aplicar_estilo.columns:
-                                if any(unidade_str in nome_coluna_df for unidade_str in ['€/kWh', '€/dia', 'Total (€)']):
+                                # Estilo para colunas de custo (Total (€) na detalhada, Total [Opção] (€) na comparativa)
+                                if nome_coluna_df in min_max_config_para_cores: # min_max_config_para_cores é o min_max_data_X_json_string convertido para dict
                                     try:
                                         serie_valores_col = pd.to_numeric(df_a_aplicar_estilo[nome_coluna_df], errors='coerce')
-                                        min_valor_col, max_valor_col = serie_valores_col.min(), serie_valores_col.max()
+                                        min_valor_col = min_max_config_para_cores[nome_coluna_df]['min']
+                                        max_valor_col = min_max_config_para_cores[nome_coluna_df]['max']
                                         df_com_estilos[nome_coluna_df] = serie_valores_col.apply(
                                             lambda valor_v: gerar_estilo_completo_para_valor(valor_v, min_valor_col, max_valor_col)
                                         )
-                                    except Exception:
+                                    except Exception as e_estilo_custo:
+                                        print(f"Erro ao aplicar estilo de custo à coluna {nome_coluna_df}: {e_estilo_custo}")
                                         df_com_estilos[nome_coluna_df] = 'text-align: center;' 
-                    
-                                elif nome_coluna_tarifario_excel and nome_coluna_df == nome_coluna_tarifario_excel:
+        
+                                elif nome_coluna_df == nome_coluna_tarifario: # 'Tarifário' ou 'NomeParaExibir'
                                     estilos_col_tarif_lista = []
                                     for idx_linha_df, valor_nome_col_tarif in df_a_aplicar_estilo[nome_coluna_df].items():
-                                        # *** USA A SÉRIE 'tipos_reais_para_estilo' QUE FOI PREPARADA ANTES ***
-                                        tipo_tarif_str = tipos_reais_para_estilo.get(idx_linha_df, '') if tipos_reais_para_estilo is not None else ''
-                            
+                                        tipo_tarif_str = tipos_reais_para_estilo_serie.get(idx_linha_df, '') if tipos_reais_para_estilo_serie is not None else ''
+                
                                         est_css_tarif = 'text-align: center; padding: 4px;' 
-                                        bg_cor_val, fonte_cor_val, fonte_peso_val = "#f0f0f0", "#000000", "normal" # Default (Fixo/Outro)
+                                        bg_cor_val, fonte_cor_val, fonte_peso_val = "#FFFFFF", "#000000", "normal" # Default Fixo/Outro (branco)
 
                                         if isinstance(valor_nome_col_tarif, str) and valor_nome_col_tarif.startswith("O Meu Tarifário"):
                                             bg_cor_val, fonte_cor_val, fonte_peso_val = "#FF0000", "#FFFFFF", "bold"
-                                        elif tipo_tarif_str == 'Indexado Média': # Agora esta condição usa o tipo real
-                                            bg_cor_val, fonte_cor_val = cor_fundo_indexado_media_css, cor_texto_indexado_media_css
-                                        elif tipo_tarif_str == 'Indexado quarto-horário': # Agora esta condição usa o tipo real
-                                            bg_cor_val, fonte_cor_val = cor_fundo_indexado_dinamico_css, cor_texto_indexado_dinamico_css
-                            
+                                        elif tipo_tarif_str == 'Indexado Média':
+                                            bg_cor_val, fonte_cor_val = cor_fundo_indexado_media_css_local, cor_texto_indexado_media_css_local
+                                        elif tipo_tarif_str == 'Indexado quarto-horário':
+                                            bg_cor_val, fonte_cor_val = cor_fundo_indexado_dinamico_css_local, cor_texto_indexado_dinamico_css_local
+                                        elif tipo_tarif_str == 'Fixo': # Para dar um fundo um pouco diferente aos fixos
+                                            bg_cor_val = "#F0F0F0" 
+                
                                         est_css_tarif += f' background-color: {bg_cor_val}; color: {fonte_cor_val}; font-weight: {fonte_peso_val};'
                                         estilos_col_tarif_lista.append(est_css_tarif)
                                     df_com_estilos[nome_coluna_df] = estilos_col_tarif_lista
-                                else:
-                                    # Para outras colunas de texto (ex: Tipo (se selecionada), Comercializador, etc.)
+                                else: # Outras colunas de texto ou sem estilização de cor baseada em valor
                                     df_com_estilos[nome_coluna_df] = 'text-align: center;'
                             return df_com_estilos
 
                         # 1. Aplicar a função de estilo principal que retorna strings CSS
-                        styler_excel = df_export_final.style.apply(estilo_geral_dataframe_para_exportar, axis=None)
+                        # Para a tabela detalhada, min_max_data_for_js é o dicionário com min/max para as colunas de preço e Total.
+                        styler_excel = df_export_final.style.apply(
+                            lambda df: estilo_geral_dataframe_para_exportar(df, tipos_reais_para_estilo, min_max_data_for_js, "Tarifário"), # Passa min_max_data_for_js
+                            axis=None
+                        )
 
                         # 2. Aplicar formatação de número (casas decimais)
                         for coluna_formatar in df_export_final.columns:
@@ -4143,7 +6406,7 @@ if not df_resultados.empty:
                         )
 
                         timestamp_final_dl = int(time.time()) # import time no início do script
-                        nome_ficheiro_final_dl = f"Tiago_Felicia_Eletricidade_resumo_{timestamp_final_dl}.xlsx"
+                        nome_ficheiro_final_dl = f"Tiago_Felicia_Eletricidade_detalhe_{timestamp_final_dl}.xlsx"
             
                         st.download_button(
                             label=f"📥 Descarregar Excel ({nome_ficheiro_final_dl})",
