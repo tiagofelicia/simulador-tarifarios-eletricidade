@@ -1177,28 +1177,54 @@ with st.expander("Opções Adicionais de Simulação (Tarifa Social e condiciona
         )
     
     # --- MOSTRAR BENEFÍCIOS APENAS SE POTÊNCIA PERMITE ---
-    if potencia <= 6.9:  # <--- CONDIÇÃO ADICIONADA AQUI
-        st.markdown(r"##### Benefícios e Condições Especiais (para potências $\leq 6.9$ kVA)") # Título condicional
+    # Inicializar as variáveis com um valor padrão (False) no início do bloco lógico.
+    # Isto garante que elas existem sempre, mesmo que as condições para mostrar as checkboxes não sejam cumpridas.
+    tarifa_social = False
+    familia_numerosa = False
+
+    if potencia <= 6.9:
+        st.markdown(r"##### Benefícios e Condições Especiais (para potências $\leq 6.9$ kVA)")
         colx1, colx2 = st.columns(2)
+    
+        # Lógica para a coluna da Tarifa Social
         with colx1:
-            # A condição interna "if potencia <= 6.9" na checkbox já não é estritamente necessária
-            # pois já estamos dentro de um bloco if potencia <= 6.9, mas não faz mal mantê-la por clareza.
-            tarifa_social = st.checkbox("Tarifa Social", value=st.session_state.get("chk_tarifa_social_val", False), help="Só pode ter Tarifa Social para potências até 6.9 kVA", key="chk_tarifa_social")
-            st.session_state["chk_tarifa_social_val"] = tarifa_social # Guardar estado
+            # CONDIÇÃO ADICIONAL: A checkbox só aparece se a potência for <= 6.9 kVA E a opção horária for "Simples".
+            if opcao_horaria.lower() == "simples":
+                # A checkbox é apresentada ao utilizador
+                tarifa_social_checkbox_val = st.checkbox(
+                    "Tarifa Social", 
+                    value=st.session_state.get("chk_tarifa_social_val", False), 
+                    help="Só pode ter Tarifa Social para potências até 6.9 kVA. Temporariamente disponível apenas na opção Simples.", 
+                    key="chk_tarifa_social"
+                )
+                st.session_state["chk_tarifa_social_val"] = tarifa_social_checkbox_val
+                tarifa_social = tarifa_social_checkbox_val # A variável principal recebe o estado da checkbox
+            else:
+                # Se a opção não for "Simples", garantimos que a Tarifa Social fica desativada
+                # e limpamos o seu estado para evitar que fique ativa de uma seleção anterior.
+                if 'chk_tarifa_social_val' in st.session_state:
+                    st.session_state['chk_tarifa_social_val'] = False
+                tarifa_social = False
+
+        # A lógica para a coluna da Família Numerosa permanece inalterada
         with colx2:
-            familia_numerosa = st.checkbox("Família Numerosa", value=st.session_state.get("chk_familia_numerosa_val", False), help="300 kWh com IVA a 6% (em vez dos normais 200 kWh) para potências até 6.9 kVA", key="chk_familia_numerosa")
-            st.session_state["chk_familia_numerosa_val"] = familia_numerosa # Guardar estado
+            familia_numerosa_checkbox_val = st.checkbox(
+                "Família Numerosa", 
+                value=st.session_state.get("chk_familia_numerosa_val", False), 
+                help="300 kWh com IVA a 6% (em vez dos normais 200 kWh) para potências até 6.9 kVA", 
+                key="chk_familia_numerosa"
+            )
+            st.session_state["chk_familia_numerosa_val"] = familia_numerosa_checkbox_val
+            familia_numerosa = familia_numerosa_checkbox_val
     else:
-        # Se potencia > 6.9, garantir que as variáveis têm um valor (False)
-        # e opcionalmente limpar o estado das checkboxes se estavam ativas
+        # Este bloco 'else' continua a ser útil para o caso de a potência ser > 6.9 kVA.
+        # Garante que ambas as opções são desativadas de forma explícita.
         tarifa_social = False
         familia_numerosa = False
-        if st.session_state.get("chk_tarifa_social_val", False): # Se estava True e agora a secção não aparece
+        if 'chk_tarifa_social_val' in st.session_state:
             st.session_state.chk_tarifa_social_val = False
-            # st.info("Tarifa Social desativada devido à potência selecionada (> 6.9 kVA).") # Mensagem pode ser mostrada fora do if, se desejado.
-        if st.session_state.get("chk_familia_numerosa_val", False):
+        if 'chk_familia_numerosa_val' in st.session_state:
             st.session_state.chk_familia_numerosa_val = False
-            # st.info("Benefício de Família Numerosa desativado devido à potência selecionada (> 6.9 kVA).")
 
     # --- CONDIÇÕES PARA ACP E CONTINENTE (dentro do expander) ---
     mostrar_widgets_acp_continente = False
