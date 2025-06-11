@@ -11,6 +11,7 @@ from st_aggrid.shared import GridUpdateMode, JsCode
 from bs4 import BeautifulSoup # Para processar o resumo HTML
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill # Para formatação Excel
 from openpyxl.utils import get_column_letter # Para nomes de colunas Excel
+from calendar import monthrange
 
 st.set_page_config(page_title="Simulador de Tarifários de Eletricidade", layout="wide")
 
@@ -95,7 +96,7 @@ def reiniciar_simulador():
     st.session_state.sel_mes = meses[mes_atual_idx] # Default do mês
     
     # Apagar as chaves das datas para que elas se recalculem com base no mês
-    for key in ['data_inicio_val', 'data_fim_val', 'dias_manual_val']:
+    for key in ['data_inicio_val', 'data_fim_val', 'dias_manual_val', 'session_initialized_dates', 'previous_mes_for_dates']:
         if key in st.session_state:
             del st.session_state[key]
 
@@ -297,11 +298,37 @@ IDENTIFICADORES_COMERCIALIZADORES_CAV_FIXA = [
     "Goldenergy",
     "Ibelectra",
     "Iberdrola",
-    "Luzigás"
+    "Luzigás",
     "Plenitude",
     "YesEnergy"     
     # Adicionar outros identificadores conforme necessário
 ]
+
+def inicializar_estado():
+    """
+    Verifica e inicializa os valores no st.session_state se ainda não existirem.
+    Isto garante que os valores padrão são definidos apenas uma vez por sessão.
+    """
+    # Valores padrão para os seletores principais
+    if "sel_potencia" not in st.session_state:
+        st.session_state.sel_potencia = 3.45
+
+    if "sel_opcao_horaria" not in st.session_state:
+        st.session_state.sel_opcao_horaria = "Simples"
+
+    if "sel_mes" not in st.session_state:
+        meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        mes_atual_idx = datetime.datetime.now().month - 1
+        st.session_state.sel_mes = meses[mes_atual_idx]
+    
+    # Pode adicionar outras inicializações aqui se necessário
+    if "chk_tarifa_social_val" not in st.session_state:
+        st.session_state.chk_tarifa_social_val = False
+    
+    if "chk_familia_numerosa_val" not in st.session_state:
+        st.session_state.chk_familia_numerosa_val = False
+
+inicializar_estado()
 
 # --- Função: Calcular taxas adicionais ---
 def calcular_taxas_adicionais(
@@ -421,7 +448,7 @@ else:
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    potencia = st.selectbox("Potência Contratada (kVA)", potencias_validas, index=potencias_validas.index(3.45) if 3.45 in potencias_validas else 2, key="sel_potencia", help="Potências BTN (1.15 kVA a 41.4 kVA)")
+    potencia = st.selectbox("Potência Contratada (kVA)", potencias_validas, key="sel_potencia", help="Potências BTN (1.15 kVA a 41.4 kVA)")
 
 if potencia in [27.6, 34.5, 41.4]:
     opcoes_validas = [o for o in opcoes_horarias if o.startswith("Tri-horário > 20.7 kVA")]
@@ -437,63 +464,85 @@ with col2:
     default_opcao_idx = 0
     if "Simples" in opcoes_validas: default_opcao_idx = opcoes_validas.index("Simples")
     elif any("Bi-horário" in o for o in opcoes_validas): default_opcao_idx = [i for i,o in enumerate(opcoes_validas) if "Bi-horário" in o][0]
-    opcao_horaria = st.selectbox("Opção Horária e Ciclo", opcoes_validas, index=default_opcao_idx, key="sel_opcao_horaria", help="Simples, Bi-horário ou Tri-horário")
+    opcao_horaria = st.selectbox("Opção Horária e Ciclo", opcoes_validas, key="sel_opcao_horaria", help="Simples, Bi-horário ou Tri-horário")
 
 with col3:
     mes_atual_idx = datetime.datetime.now().month - 1
-    mes = st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], index=mes_atual_idx, key="sel_mes", help="Se o mês escolhido já tiver terminado, o valor do OMIE é final, se ainda estiver em curso será com Futuros, que pode consultar no site www.tiagofelicia.pt")
+    mes = st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes", help="Se o mês escolhido já tiver terminado, o valor do OMIE é final, se ainda estiver em curso será com Futuros, que pode consultar no site www.tiagofelicia.pt")
 
 # --- Datas e dias ---
+# --- Datas e dias (LÓGICA HÍBRIDA E CORRIGIDA) ---
 dias_mes = {"Janeiro": 31, "Fevereiro": 28, "Março": 31, "Abril": 30, "Maio": 31, "Junho": 30, "Julho": 31, "Agosto": 31, "Setembro": 30, "Outubro": 31, "Novembro": 30, "Dezembro": 31}
 ano_atual = datetime.datetime.now().year
 
-# Lógica para ano bissexto em Fevereiro
 if mes == "Fevereiro" and ((ano_atual % 4 == 0 and ano_atual % 100 != 0) or (ano_atual % 400 == 0)):
     dias_mes["Fevereiro"] = 29
 mes_num = list(dias_mes.keys()).index(mes) + 1
 
-# --- Lógica de Gestão de Estado para Datas e Dias ---
-# Guardar o 'mes' da execução anterior para detetar se mudou
-previous_mes = st.session_state.get('previous_mes_for_dates', None)
-mes_changed = (previous_mes != mes)
+
+# --- LÓGICA DE GESTÃO DE ESTADO PARA DATAS ---
+
+# 1. INICIALIZAÇÃO NA PRIMEIRA EXECUÇÃO DA SESSÃO
+if 'session_initialized_dates' not in st.session_state:
+    hoje = datetime.date.today()
+    data_inicial_default_calc = hoje + datetime.timedelta(days=1)
+    
+    ano_final_calc = data_inicial_default_calc.year
+    mes_final_calc = data_inicial_default_calc.month + 1
+    if mes_final_calc > 12:
+        mes_final_calc = 1
+        ano_final_calc += 1
+    
+    dias_no_mes_final = monthrange(ano_final_calc, mes_final_calc)[1]
+    dia_final_calc = min(data_inicial_default_calc.day, dias_no_mes_final)
+    data_final_bruta = datetime.date(ano_final_calc, mes_final_calc, dia_final_calc)
+    data_final_default_calc = data_final_bruta - datetime.timedelta(days=1)
+    
+    st.session_state.data_inicio_val = data_inicial_default_calc
+    st.session_state.data_fim_val = data_final_default_calc
+    st.session_state.previous_mes_for_dates = mes
+    st.session_state.session_initialized_dates = True
+
+# 2. VERIFICAR SE O UTILIZADOR MUDOU O MÊS
+mes_changed = st.session_state.get('previous_mes_for_dates') != mes
 if mes_changed:
     st.session_state.previous_mes_for_dates = mes
-    # Se o mês mudou, invalidar os valores de data e dias manuais guardados para que usem os defaults do novo mês
-    keys_to_delete_on_mes_change = ['data_inicio_val', 'data_fim_val', 'dias_manual_val']
-    for key in keys_to_delete_on_mes_change:
-        if key in st.session_state:
-            del st.session_state[key]
+    
+    primeiro_dia_mes_selecionado = datetime.date(ano_atual, mes_num, 1)
+    ultimo_dia_mes_selecionado = datetime.date(ano_atual, mes_num, dias_mes[mes])
+    
+    st.session_state.data_inicio_val = primeiro_dia_mes_selecionado
+    st.session_state.data_fim_val = ultimo_dia_mes_selecionado
+    
+    if 'dias_manual_val' in st.session_state:
+        del st.session_state['dias_manual_val']
 
-# Definir datas default com base no mês atual (ou do session_state se não mudou)
-default_data_inicio = st.session_state.get('data_inicio_val', datetime.date(ano_atual, mes_num, 1))
-default_data_fim = st.session_state.get('data_fim_val', datetime.date(ano_atual, mes_num, dias_mes[mes]))
-
+# 3. CRIAR OS WIDGETS DE DATA E DIAS
 col4, col5, col6 = st.columns(3)
 with col4:
-    data_inicio = st.date_input("Data Inicial", value=default_data_inicio, key="data_inicio_key_input", help="A partir de 01/01/2025. Muito importante para tarifários Indexados. Se não modificar as datas, será cálculado com os dias do mês selecionado.")
-    st.session_state['data_inicio_val'] = data_inicio # Sempre atualiza com o valor do input
-with col5:
-    data_fim = st.date_input("Data Final", value=default_data_fim, key="data_fim_key_input", help="De Data Inicial a 31/12/2025. Muito importante para tarifários Indexados. Se não modificar as datas, será cálculado com os dias do mês selecionado.")
-    st.session_state['data_fim_val'] = data_fim # Sempre atualiza
+    # Guardar o valor da data ANTES de criar o widget
+    data_inicio_anterior = st.session_state.get('data_inicio_val')
+    data_inicio = st.date_input("Data Inicial", value=st.session_state.data_inicio_val, key="data_inicio_key_input", help="A partir de 01/01/2025. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte.")
+    # A key "data_inicio_key_input" atualiza st.session_state.data_inicio_val automaticamente
 
-# Calcular dias_default com base nas datas ATUAIS dos inputs
+with col5:
+    # Guardar o valor da data ANTES de criar o widget
+    data_fim_anterior = st.session_state.get('data_fim_val')
+    data_fim = st.date_input("Data Final", value=st.session_state.data_fim_val, key="data_fim_key_input", help="De Data Inicial a 31/12/2025. Se não modificar as datas ou o mês, será calculado até um mês após a data inicial.")
+
+# Lógica de reset para os dias manuais simplificada
+data_inicio_mudou_manualmente = data_inicio_anterior != data_inicio
+data_fim_mudou_manualmente = data_fim_anterior != data_fim
+
+# Se o mês mudou OU se alguma data mudou manualmente, resetamos os dias manuais
+if mes_changed or data_inicio_mudou_manualmente or data_fim_mudou_manualmente:
+    if 'dias_manual_val' in st.session_state:
+        del st.session_state['dias_manual_val']
+
+# Calcular dias_default com base nas datas ATUAIS
 dias_default_calculado = (data_fim - data_inicio).days + 1 if data_fim >= data_inicio else 0
 
 with col6:
-    # Se as datas de início/fim foram alteradas DIRETAMENTE pelo utilizador nesta execução
-    # (e não por uma mudança de mês que já limpou 'dias_manual_val'),
-    # então 'dias_manual_val' também deve ser apagadado para usar o novo dias_default_calculado.
-    data_inicio_widget_changed = st.session_state.get('data_inicio_key_input') != default_data_inicio if 'data_inicio_key_input' in st.session_state else False
-    data_fim_widget_changed = st.session_state.get('data_fim_key_input') != default_data_fim if 'data_fim_key_input' in st.session_state else False
-
-    # A condição de reset de dias_manual_val:
-    # 1. Mês mudou (já tratado acima, 'dias_manual_val' foi apagado)
-    # 2. Ou, se o mês NÃO mudou, mas data_inicio ou data_fim foram alteradas diretamente
-    if not mes_changed and (data_inicio_widget_changed or data_fim_widget_changed):
-        if 'dias_manual_val' in st.session_state:
-            del st.session_state['dias_manual_val']
-            # st.write("Debug: dias_manual_val apagadado devido à mudança direta de data_inicio/data_fim.")
-
     dias_manual_input_val = st.number_input("Número de Dias (manual)", min_value=0,
                                         value=st.session_state.get('dias_manual_val', dias_default_calculado),
                                         step=1, key="dias_manual_input_key", help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos nos tarifários indexados")
@@ -503,6 +552,7 @@ with col6:
         dias = dias_default_calculado
     else:
         dias = int(dias_manual_input_val)
+
 st.write(f"Dias considerados: **{dias} dias**")
 
 
@@ -1539,13 +1589,47 @@ def calcular_detalhes_custo_tarifario_fixo(
         
         # Desconto Continente
         custo_base_para_continente = custo_antes_desconto_meo
-        custo_total_final = custo_base_para_continente # Custo final por defeito
+        custo_total_final = custo_base_para_continente 
         valor_X_desconto_continente_aplicado = 0.0
+
         if desconto_continente_input and nome_tarifario_original.startswith("Galp & Continente"):
-            valor_X_desconto_continente_aplicado = (decomposicao_custo_energia_tf['custo_com_iva'] + decomposicao_custo_potencia_tf_calc['custo_com_iva']) * 0.10
-            custo_total_final -= valor_X_desconto_continente_aplicado
-            nome_a_exibir_final += f" (INCLUI desc. Cont. de {valor_X_desconto_continente_aplicado:.2f}€, s/ desc. Cont.={custo_base_para_continente:.2f}€)"
-        
+    
+            # PASSO ADICIONAL: CALCULAR O CUSTO BRUTO (SEM TARIFA SOCIAL) APENAS PARA ESTE DESCONTO
+    
+            # 1. Preço unitário bruto da energia (sem IVA e sem desconto TS)
+            preco_energia_bruto_sem_iva = {}
+            for p in consumos_repartidos_dict.keys():
+                if p in preco_comercializador_energia_tf:
+                    preco_energia_bruto_sem_iva[p] = (
+                        preco_comercializador_energia_tf[p] + 
+                        tar_energia_regulada_tf.get(p, 0.0) + # <--- USA A TAR BRUTA, sem desconto TS
+                        financiamento_tse_a_adicionar_tf
+                    )
+
+            # 2. Preço unitário bruto da potência (sem IVA e sem desconto TS)
+            preco_comerc_pot_bruto = preco_comercializador_potencia_tf
+            tar_potencia_bruta = tar_potencia_regulada_tf # <--- USA A TAR BRUTA, sem desconto TS
+
+            # 3. Calcular o custo bruto COM IVA para a energia e potência
+            custo_energia_bruto_cIVA = calcular_custo_energia_com_iva(
+                consumo_total_neste_oh,
+                preco_energia_bruto_sem_iva.get('S'),
+                {k: v for k, v in preco_energia_bruto_sem_iva.items() if k != 'S'},
+                dias_calculo, potencia_contratada_kva, opcao_horaria_para_calculo,
+                consumos_repartidos_dict, familia_numerosa_ativa
+            )
+            custo_potencia_bruto_cIVA = calcular_custo_potencia_com_iva_final(
+                preco_comerc_pot_bruto,
+                tar_potencia_bruta,
+                dias_calculo, potencia_contratada_kva
+            )
+    
+            # 4. Calcular o valor do cupão sobre os custos brutos
+            valor_X_desconto_continente_aplicado = (custo_energia_bruto_cIVA['custo_com_iva'] + custo_potencia_bruto_cIVA['custo_com_iva']) * 0.10
+    
+            # 5. Aplicar o valor do cupão ao custo final (que já tem o desconto TS, se aplicável)
+            custo_total_final = custo_base_para_continente - valor_X_desconto_continente_aplicado
+            nome_a_exibir_final += f" (INCLUI desc. Cont. de {valor_X_desconto_continente_aplicado:.2f}€, s/ desc. Cont.={custo_base_para_continente:.2f}€)"        
         # --- Construir Dicionários de Tooltip ---
         # Tooltip Energia
         componentes_tooltip_energia_dict = {}
@@ -2135,33 +2219,33 @@ if meu_tarifario_ativo:
 
     if opcao_horaria.lower() == "simples":
         with col_user1:
-            energia_meu = st.number_input("Preço Energia (€/kWh)", min_value=0.0, step=0.0001, format="%.4f",
+            energia_meu = st.number_input("Preço Energia (€/kWh)", min_value=0.0, step=0.001, format="%g",
                                         value=st.session_state.get(key_energia_meu_s, None), key=key_energia_meu_s)
         with col_user2:
-            potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.0001, format="%.4f",
+            potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.001, format="%g",
                                          value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu)
     elif opcao_horaria.lower().startswith("bi"):
         with col_user1:
-            energia_vazio_meu = st.number_input("Preço Vazio (€/kWh)", min_value=0.0, step=0.0001, format="%.4f",
+            energia_vazio_meu = st.number_input("Preço Vazio (€/kWh)", min_value=0.0, step=0.001, format="%g",
                                               value=st.session_state.get(key_energia_meu_v, None), key=key_energia_meu_v)
         with col_user2:
-            energia_fora_vazio_meu = st.number_input("Preço Fora Vazio (€/kWh)", min_value=0.0, step=0.0001, format="%.4f",
+            energia_fora_vazio_meu = st.number_input("Preço Fora Vazio (€/kWh)", min_value=0.0, step=0.001, format="%g",
                                                    value=st.session_state.get(key_energia_meu_f, None), key=key_energia_meu_f)
         with col_user3:
-            potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.0001, format="%.4f",
+            potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.001, format="%g",
                                          value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu)
     elif opcao_horaria.lower().startswith("tri"):
         with col_user1:
-            energia_vazio_meu = st.number_input("Preço Vazio (€/kWh)", min_value=0.0, step=0.0001, format="%.4f",
+            energia_vazio_meu = st.number_input("Preço Vazio (€/kWh)", min_value=0.0, step=0.001, format="%g",
                                               value=st.session_state.get(key_energia_meu_v, None), key=key_energia_meu_v)
         with col_user2:
-            energia_cheias_meu = st.number_input("Preço Cheias (€/kWh)", min_value=0.0, step=0.0001, format="%.4f",
+            energia_cheias_meu = st.number_input("Preço Cheias (€/kWh)", min_value=0.0, step=0.001, format="%g",
                                                value=st.session_state.get(key_energia_meu_c, None), key=key_energia_meu_c)
         with col_user3:
-            energia_ponta_meu = st.number_input("Preço Ponta (€/kWh)", min_value=0.0, step=0.0001, format="%.4f",
+            energia_ponta_meu = st.number_input("Preço Ponta (€/kWh)", min_value=0.0, step=0.001, format="%g",
                                               value=st.session_state.get(key_energia_meu_p, None), key=key_energia_meu_p)
         with col_user4:
-            potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.0001, format="%.4f",
+            potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.001, format="%g",
                                          value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu)
 
     col_userx1, col_userx2, col_userx3 = st.columns(3)
@@ -4062,22 +4146,48 @@ if not tarifarios_filtrados_fixos.empty:
         # --- LÓGICA PARA DESCONTO CONTINENTE (NOVO BLOCO) ---
         # A base para o desconto Continente deve ser o custo APÓS o desconto MEO
         custo_base_para_continente_tf = custo_antes_desconto_meo_tf
-        custo_total_estimado_final_tf = custo_base_para_continente_tf # Por defeito, é este o custo final
+        custo_total_estimado_final_tf = custo_base_para_continente_tf
         valor_X_desconto_continente = 0.0
 
-        # A flag desconto_continente vem da checkbox geral
         if desconto_continente and isinstance(nome_tarifario_excel, str) and nome_tarifario_excel.startswith("Galp & Continente"):
-            # Calcular o valor X do desconto Continente (10% sobre energia com IVA + 10% sobre potência com IVA)
-            valor_X_desconto_continente_energia = custo_energia_tf_com_iva['custo_com_iva'] * 0.10
-            valor_X_desconto_continente_potencia = custo_potencia_tf_com_iva['custo_com_iva'] * 0.10
+    
+            # PASSO ADICIONAL: CALCULAR O CUSTO BRUTO (SEM TARIFA SOCIAL) APENAS PARA ESTE DESCONTO
+    
+            # 1. Preço unitário bruto da energia (sem IVA e sem desconto TS)
+            preco_energia_bruto_sem_iva = {}
+            for p in preco_comercializador_energia_tf.keys():
+                preco_energia_bruto_sem_iva[p] = (
+                    preco_comercializador_energia_tf.get(p, 0.0) + 
+                    tar_energia_regulada_tf.get(p, 0.0) + # <--- USA A TAR BRUTA, sem desconto TS
+                    financiamento_tse_a_adicionar_tf
+                )
+    
+            # 2. Preço unitário bruto da potência (sem IVA e sem desconto TS)
+            # Requer as componentes brutas
+            preco_comercializador_potencia_bruto = preco_comercializador_potencia_tf 
+            tar_potencia_bruta = tar_potencia_regulada_tf # <--- USA A TAR BRUTA, sem desconto TS
+
+            # 3. Calcular o custo bruto COM IVA para a energia e potência
+            custo_energia_bruto_cIVA = calcular_custo_energia_com_iva(
+                consumo,
+                preco_energia_bruto_sem_iva.get('S'),
+                {k: v for k, v in preco_energia_bruto_sem_iva.items() if k != 'S'},
+                dias, potencia, opcao_horaria, consumos_horarios_para_func_tf, familia_numerosa
+            )
+            custo_potencia_bruto_cIVA = calcular_custo_potencia_com_iva_final(
+                preco_comercializador_potencia_bruto,
+                tar_potencia_bruta,
+                dias, potencia
+            )
+
+            # 4. Calcular o valor do cupão sobre os custos brutos
+            valor_X_desconto_continente_energia = custo_energia_bruto_cIVA['custo_com_iva'] * 0.10
+            valor_X_desconto_continente_potencia = custo_potencia_bruto_cIVA['custo_com_iva'] * 0.10
             valor_X_desconto_continente = valor_X_desconto_continente_energia + valor_X_desconto_continente_potencia
 
-            # Aplicar o desconto X ao custo que já tinha outros ajustes (Y)
+            # 5. Aplicar o valor do cupão ao custo final (que já tem o desconto TS, se aplicável)
             custo_total_estimado_final_tf = custo_base_para_continente_tf - valor_X_desconto_continente
-
-            # Modificar o nome_a_exibir para incluir a informação do desconto Continente
-            nome_a_exibir += f" (INCLUI desc. Continente de {valor_X_desconto_continente:.2f}€, s/ desc. Cont.={custo_base_para_continente_tf:.2f}€)"
-        # --- FIM DA LÓGICA DESCONTO CONTINENTE ---
+            nome_a_exibir += f" (INCLUI desc. Cont. de {valor_X_desconto_continente:.2f}€, s/ desc. Cont.={custo_base_para_continente_tf:.2f}€)"        # --- FIM DA LÓGICA DESCONTO CONTINENTE ---
 
         # --- Passo 9: Preparar Resultados para Exibição ---
         valores_energia_exibir_tf = {} # Recalcular ou usar o já calculado 'preco_energia_final_sem_iva_tf'
