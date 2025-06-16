@@ -471,7 +471,6 @@ with col3:
     mes = st.selectbox("Mês", ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"], key="sel_mes", help="Se o mês escolhido já tiver terminado, o valor do OMIE é final, se ainda estiver em curso será com Futuros, que pode consultar no site www.tiagofelicia.pt")
 
 # --- Datas e dias ---
-# --- Datas e dias (LÓGICA HÍBRIDA E CORRIGIDA) ---
 dias_mes = {"Janeiro": 31, "Fevereiro": 28, "Março": 31, "Abril": 30, "Maio": 31, "Junho": 30, "Julho": 31, "Agosto": 31, "Setembro": 30, "Outubro": 31, "Novembro": 30, "Dezembro": 31}
 ano_atual = datetime.datetime.now().year
 
@@ -503,6 +502,7 @@ if 'session_initialized_dates' not in st.session_state:
     st.session_state.previous_mes_for_dates = mes
     st.session_state.session_initialized_dates = True
 
+
 # 2. VERIFICAR SE O UTILIZADOR MUDOU O MÊS
 mes_changed = st.session_state.get('previous_mes_for_dates') != mes
 if mes_changed:
@@ -519,22 +519,29 @@ if mes_changed:
 
 # 3. CRIAR OS WIDGETS DE DATA E DIAS
 col4, col5, col6 = st.columns(3)
+
+# Guardar os valores antes de os widgets poderem ser alterados, para detetar mudanças manuais
+data_inicio_anterior = st.session_state.get('data_inicio_val')
+data_fim_anterior = st.session_state.get('data_fim_val')
+
 with col4:
-    # Guardar o valor da data ANTES de criar o widget
-    data_inicio_anterior = st.session_state.get('data_inicio_val')
-    data_inicio = st.date_input("Data Inicial", value=st.session_state.data_inicio_val, key="data_inicio_key_input", help="A partir de 01/01/2025. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte.")
-    # A key "data_inicio_key_input" atualiza st.session_state.data_inicio_val automaticamente
+    data_inicio = st.date_input("Data Inicial", 
+                                value=st.session_state.data_inicio_val, 
+                                format="DD/MM/YYYY",
+                                key="data_inicio_key_input", 
+                                help="A partir de 01/01/2025. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte ao atual.")
 
 with col5:
-    # Guardar o valor da data ANTES de criar o widget
-    data_fim_anterior = st.session_state.get('data_fim_val')
-    data_fim = st.date_input("Data Final", value=st.session_state.data_fim_val, key="data_fim_key_input", help="De Data Inicial a 31/12/2025. Se não modificar as datas ou o mês, será calculado até um mês após a data inicial.")
+    data_fim = st.date_input("Data Final", 
+                             value=st.session_state.data_fim_val, 
+                             format="DD/MM/YYYY",
+                             key="data_fim_key_input", 
+                             help="De Data Inicial a 31/12/2025. Se não modificar as datas ou o mês, será calculado até um mês após a data inicial.")
 
-# Lógica de reset para os dias manuais simplificada
+# Lógica de reset para os dias manuais
 data_inicio_mudou_manualmente = data_inicio_anterior != data_inicio
 data_fim_mudou_manualmente = data_fim_anterior != data_fim
 
-# Se o mês mudou OU se alguma data mudou manualmente, resetamos os dias manuais
 if mes_changed or data_inicio_mudou_manualmente or data_fim_mudou_manualmente:
     if 'dias_manual_val' in st.session_state:
         del st.session_state['dias_manual_val']
@@ -545,13 +552,14 @@ dias_default_calculado = (data_fim - data_inicio).days + 1 if data_fim >= data_i
 with col6:
     dias_manual_input_val = st.number_input("Número de Dias (manual)", min_value=0,
                                         value=st.session_state.get('dias_manual_val', dias_default_calculado),
-                                        step=1, key="dias_manual_input_key", help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos nos tarifários indexados")
+                                        step=1, key="dias_manual_input_key", 
+                                        help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos nos tarifários indexados")
     st.session_state['dias_manual_val'] = dias_manual_input_val
 
-    if pd.isna(dias_manual_input_val) or dias_manual_input_val <= 0:
-        dias = dias_default_calculado
-    else:
-        dias = int(dias_manual_input_val)
+if pd.isna(dias_manual_input_val) or dias_manual_input_val <= 0:
+    dias = dias_default_calculado
+else:
+    dias = int(dias_manual_input_val)
 
 st.write(f"Dias considerados: **{dias} dias**")
 
