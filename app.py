@@ -4326,14 +4326,14 @@ if not tarifarios_filtrados_fixos.empty:
 # --- Fim do loop for tarifario_fixo ---
 
 # --- Comparar Tarifários Indexados (se a checkbox estiver ativa) ---
-if comparar_indexados:
-    if df_omie_ajustado.empty:
-        st.warning("Não existem dados OMIE para o período selecionado. Tarifários indexados não podem ser calculados.")
-    else:
-        tarifarios_filtrados_indexados = ti_processar[
-            (ti_processar['opcao_horaria_e_ciclo'] == opcao_horaria) &
-            (ti_processar['potencia_kva'] == potencia)
-        ].copy()
+
+if df_omie_ajustado.empty:
+    st.warning("Não existem dados OMIE para o período selecionado. Tarifários indexados não podem ser calculados.")
+else:
+    tarifarios_filtrados_indexados = ti_processar[
+        (ti_processar['opcao_horaria_e_ciclo'] == opcao_horaria) &
+        (ti_processar['potencia_kva'] == potencia)
+    ].copy()
 
     # Usar a estrutura simplificada do if/else
     if not tarifarios_filtrados_indexados.empty:
