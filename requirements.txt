@@ -1,5 +1,5 @@
-streamlit
-pandas
+streamlit==1.45.0
+pandas==2.2.3
 openpyxl
-streamlit-aggrid
+streamlit-aggrid==1.1.4.post1
 beautifulsoup4
