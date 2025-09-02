@@ -4137,11 +4137,11 @@ if not tarifarios_filtrados_fixos.empty:
             opcao_horaria_lower = str(opcao_horaria).lower()
 
             if opcao_horaria_lower == "simples":
-                desconto_meo_mensal_base = 2.95
+                desconto_meo_mensal_base = 0
             elif opcao_horaria_lower.startswith("bi"): # Cobre "bi-horário semanal" e "bi-horário diário"
-                desconto_meo_mensal_base = 3.50
+                desconto_meo_mensal_base = 0
             elif opcao_horaria_lower.startswith("tri"): # Cobre "tri-horário semanal" e "tri-horário diário"
-                desconto_meo_mensal_base = 6.27
+                desconto_meo_mensal_base = 0
         
             if desconto_meo_mensal_base > 0 and dias > 0:
                 desconto_meo_aplicado_periodo = (desconto_meo_mensal_base / 30.0) * dias
