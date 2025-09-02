@@ -1810,7 +1810,7 @@ def calcular_detalhes_custo_tarifario_indexado(
                     elif nome_tarifario_original == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('Repsol_FA', 0.0) + constantes_dict_local.get('Repsol_Q_Tarifa_Pro', 0.0))
                     elif nome_tarifario_original == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Galp_Ci', 0.0)) * perdas_val_qh
                     elif nome_tarifario_original == "Alfa Energia - ALFA POWER INDEX BTN": calculo_instantaneo_sem_perfil_qh = ((omie_val_qh + constantes_dict_local.get('Alfa_CGS', 0.0)) * perdas_val_qh + constantes_dict_local.get('Alfa_K', 0.0))
-                    elif nome_tarifario_original == "Plenitude - Tendência - Há Cashback 30 €": calculo_instantaneo_sem_perfil_qh = ((omie_val_qh + constantes_dict_local.get('Plenitude_CGS', 0.0) + constantes_dict_local.get('Plenitude_GDOs', 0.0)) * perdas_val_qh + constantes_dict_local.get('Plenitude_Fee', 0.0))
+                    elif nome_tarifario_original == "Plenitude - Tendência": calculo_instantaneo_sem_perfil_qh = ((omie_val_qh + constantes_dict_local.get('Plenitude_CGS', 0.0) + constantes_dict_local.get('Plenitude_GDOs', 0.0)) * perdas_val_qh + constantes_dict_local.get('Plenitude_Fee', 0.0))
                     elif nome_tarifario_original == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Meo_K', 0.0)) * perdas_val_qh
                     elif nome_tarifario_original == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('EDP_H_K1', 1.0) + constantes_dict_local.get('EDP_H_K2', 0.0))
                     elif nome_tarifario_original == "EZU - Coletiva": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('EZU_K', 0.0) + constantes_dict_local.get('EZU_CGS', 0.0)) * perdas_val_qh
@@ -2284,7 +2284,7 @@ if meu_tarifario_ativo:
     
 
 
-    if st.button("Calcular e Adicionar O Meu Tarifário à Comparação", key="btn_meu_tarifario"):
+    if st.button("Calcular e Adicionar O Meu Tarifário à Comparação", icon="🧮", type="primary", key="btn_meu_tarifario", use_container_width=True):
         # Ler os valores dos inputs. Como eles têm 'key', já estão no st.session_state.
         # As variáveis locais (energia_meu, potencia_meu, etc.) já contêm os valores dos widgets.
 
@@ -4447,7 +4447,7 @@ else:
                             elif nome_tarifario == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('Repsol_FA', 0.0) + constantes.get('Repsol_Q_Tarifa_Pro', 0.0))
                             elif nome_tarifario == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil = (omie + constantes.get('Galp_Ci', 0.0)) * perdas
                             elif nome_tarifario == "Alfa Energia - ALFA POWER INDEX BTN": calculo_instantaneo_sem_perfil = ((omie + constantes.get('Alfa_CGS', 0.0)) * perdas + constantes.get('Alfa_K', 0.0))
-                            elif nome_tarifario == "Plenitude - Tendência - Há Cashback 30 €": calculo_instantaneo_sem_perfil = (((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0))) * perdas + constantes.get('Plenitude_Fee', 0.0))
+                            elif nome_tarifario == "Plenitude - Tendência": calculo_instantaneo_sem_perfil = (((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0))) * perdas + constantes.get('Plenitude_Fee', 0.0))
                             elif nome_tarifario == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil = (omie + constantes.get('Meo_K', 0.0)) * perdas
                             elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
                             elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
