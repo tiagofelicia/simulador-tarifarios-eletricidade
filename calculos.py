@@ -514,14 +514,14 @@ def calcular_custo_completo_diagrama_carga(tarifario_idx, df_consumos_reais, df_
             base_desconto_continente = decomposicao_energia_bruta['custo_com_iva'] + decomposicao_potencia_bruta['custo_com_iva']
             
             # ### DESCONTO DE 10% ###
-            if nome_tarifario.startswith("Galp & Continente (-10% DD"):
+            if nome_tarifario.startswith("Galp & Continente (-10% DD)"):
                 desconto_aplicado = base_desconto_continente * 0.10
                 custo_final_com_descontos -= desconto_aplicado
                 desconto_total_final += desconto_aplicado
                 nome_a_exibir += f" (INCLUI desc. Cont. de {desconto_aplicado:.2f}€, s/ desc. Cont.={(custo_final_com_descontos + desconto_aplicado):.2f}€)"
             
             # ### DESCONTO DE 7% ###
-            elif nome_tarifario.startswith("Galp & Continente (-7%"):
+            elif nome_tarifario.startswith("Galp & Continente (-7% s/DD)"):
                 desconto_aplicado = base_desconto_continente * 0.07
                 custo_final_com_descontos -= desconto_aplicado
                 desconto_total_final += desconto_aplicado
@@ -894,13 +894,13 @@ def calcular_detalhes_custo_tarifario_fixo(
             )
 
             # ### DESCONTO DE 10% ###
-            if nome_tarifario_original.startswith("Galp & Continente (-10% DD"):
+            if nome_tarifario_original.startswith("Galp & Continente (-10% DD)"):
                 valor_X_desconto_continente_aplicado = (custo_energia_bruto_cIVA['custo_com_iva'] + custo_potencia_bruto_cIVA['custo_com_iva']) * 0.10
                 custo_total_final = custo_base_para_continente - valor_X_desconto_continente_aplicado
                 nome_a_exibir_final += f" (INCLUI desc. Cont. de {valor_X_desconto_continente_aplicado:.2f}€, s/ desc. Cont.={custo_base_para_continente:.2f}€)"
             
             # ### DESCONTO DE 7% ###
-            elif nome_tarifario_original.startswith("Galp & Continente (-7%"):
+            elif nome_tarifario_original.startswith("Galp & Continente (-7% s/DD)"):
                 valor_X_desconto_continente_aplicado = (custo_energia_bruto_cIVA['custo_com_iva'] + custo_potencia_bruto_cIVA['custo_com_iva']) * 0.07
                 custo_total_final = custo_base_para_continente - valor_X_desconto_continente_aplicado
                 nome_a_exibir_final += f" (INCLUI desc. Cont. de {valor_X_desconto_continente_aplicado:.2f}€, s/ desc. Cont.={custo_base_para_continente:.2f}€)"

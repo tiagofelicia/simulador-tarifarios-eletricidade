@@ -4451,7 +4451,7 @@ with st.spinner("A calcular os custos para todos os tarifários... por favor, ag
                     nome_a_exibir += f" (INCLUI desc. Cont. de {valor_X_desconto_continente:.2f}€, s/ desc. Cont.={custo_base_para_continente_tf:.2f}€)"
 
                 # ### DESCONTO DE 7% ###
-                elif nome_tarifario_excel.startswith("Galp & Continente (-7%)"):
+                elif nome_tarifario_excel.startswith("Galp & Continente (-7% s/DD)"):
                     valor_X_desconto_continente = (custo_energia_bruto_cIVA['custo_com_iva'] + custo_potencia_bruto_cIVA['custo_com_iva']) * 0.07
                     custo_total_estimado_final_tf = custo_base_para_continente_tf - valor_X_desconto_continente
                     nome_a_exibir += f" (INCLUI desc. Cont. de {valor_X_desconto_continente:.2f}€, s/ desc. Cont.={custo_base_para_continente_tf:.2f}€)"
