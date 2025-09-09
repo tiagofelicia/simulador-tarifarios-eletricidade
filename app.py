@@ -7273,147 +7273,147 @@ if st.session_state.get("chk_autoconsumo_ativo", False) and is_diagram_mode:
 # --- FIM: SECÇÃO ANÁLISE DE POUPANÇA COM AUTOCONSUMO ---
 # ##################################################################
 
-    if is_diagram_mode:
-    
-        if 'df_resultados' in locals() and not df_resultados.empty:
-            df_para_analise = df_resultados.copy()
+if is_diagram_mode:
 
-            # Filtrar apenas os resultados que são baseados no diagrama
-            tarifarios_diagrama = df_para_analise[df_para_analise['Tipo'].str.contains("Diagrama", na=False)]
-            tarifarios_perfil = df_para_analise[df_para_analise['NomeParaExibir'].str.contains("Perfil", na=False)]
+    if 'df_resultados' in locals() and not df_resultados.empty:
+        df_para_analise = df_resultados.copy()
 
-            if not tarifarios_diagrama.empty and not tarifarios_perfil.empty:
+        # Filtrar apenas os resultados que são baseados no diagrama
+        tarifarios_diagrama = df_para_analise[df_para_analise['Tipo'].str.contains("Diagrama", na=False)]
+        tarifarios_perfil = df_para_analise[df_para_analise['NomeParaExibir'].str.contains("Perfil", na=False)]
 
-                with st.expander("🔍 Análise de Desvios (Perfil Real vs. Perfil Padrão ERSE)", expanded=False):
-            
-                    st.markdown("""
-                    Esta análise compara o custo da sua fatura usando o seu **perfil de consumo real** (extraído do ficheiro) 
-                    contra o custo que teria se o seu consumo seguisse o **perfil padrão definido pela ERSE**.
-                    Isto ajuda a perceber se o seu padrão de consumo é, por si só, mais económico que a média.
-                    """)
+        if not tarifarios_diagrama.empty and not tarifarios_perfil.empty:
 
-                    analise_list = []
+            with st.expander("🔍 Análise de Desvios (Perfil Real vs. Perfil Padrão ERSE)", expanded=False):
+        
+                st.markdown("""
+                Esta análise compara o custo da sua fatura usando o seu **perfil de consumo real** (extraído do ficheiro) 
+                contra o custo que teria se o seu consumo seguisse o **perfil padrão definido pela ERSE**.
+                Isto ajuda a perceber se o seu padrão de consumo é, por si só, mais económico que a média.
+                """)
 
-                    for _, linha_diagrama in tarifarios_diagrama.iterrows():
-                        # Usar a função para obter um nome limpo e fiável
-                        nome_base_diagrama = extrair_nome_base_tarifario(linha_diagrama['NomeParaExibir'])
-                    
-                        # Procurar um par correspondente nos tarifários de perfil
-                        for _, linha_perfil in tarifarios_perfil.iterrows():
-                            nome_base_perfil = extrair_nome_base_tarifario(linha_perfil['NomeParaExibir'])
-                        
-                            if nome_base_diagrama == nome_base_perfil:
-                                custo_real = linha_diagrama['Total (€)']
-                                custo_perfil_erse = linha_perfil['Total (€)']
-                            
-                                if pd.notna(custo_real) and pd.notna(custo_perfil_erse):
-                                    diferenca = custo_real - custo_perfil_erse
-                                    analise_list.append({
-                                        "Tarifário": nome_base_diagrama, # Usar o nome base limpo
-                                        "Custo com o seu Perfil Real (€)": custo_real,
-                                        "Custo com Perfil Padrão ERSE (€)": custo_perfil_erse,
-                                        "Diferença (€)": diferenca
-                                    })
-                                    # Sair do loop interno assim que encontrar o par
-                                    break
+                analise_list = []
 
-                    if analise_list:
-                        df_analise = pd.DataFrame(analise_list).sort_values(by="Custo com Perfil Padrão ERSE (€)")
-                        
-                        # ### INVERTER A LÓGICA DE CORES ###
-                        def estilo_diferenca_poupanca(val):
-                            if pd.isna(val): return ''
-                            # Valores negativos ou zero (poupança) são verdes. Positivos (custo extra) são vermelhos.
-                            cor = '#28a745' if val <= 0 else '#dc3545'
-                            return f'background-color: {cor}; color: white; font-weight: bold;'
-                        st.dataframe(
-                            df_analise.style.format({
-                                "Custo com o seu Perfil Real (€)": "{:.2f} €",
-                                "Custo com Perfil Padrão ERSE (€)": "{:.2f} €",
-                                "Diferença (€)": "{:+.2f} €"
-                            }).apply(lambda x: [estilo_diferenca_poupanca(v) for v in x], subset=['Diferença (€)']),
-                            use_container_width=True,
-                            hide_index=True
-                        )
-                        st.caption("Valores negativos na 'Diferença' (verde) significam que o seu perfil é MAIS ECONÓMICO que o padrão.")
-                    else:
-                        st.info("Não foi possível encontrar pares de tarifários (Diagrama e Perfil) para comparar com os filtros atuais.")
-
-    # --- FIM DA SECÇÃO ---
-    # ##################################################################
-    st.subheader("🔗 Partilhar Simulação")
-
-    if st.query_params:
-        base_url = "https://tiagofelicia.streamlit.app/"
-        params_filtrados = {k: v for k, v in st.query_params.items() if v and v != '0'}
-
-        if params_filtrados:
-            query_string = "&".join([f"{k}={v}" for k, v in params_filtrados.items()])
-            shareable_link = f"{base_url}?{query_string}"
-
-            # --- Componente HTML/JS para o campo de texto e botão de copiar ---
-            html_componente_copiar = f"""
-            <div style="display: flex; align-items: center; gap: 8px; font-family: sans-serif;">
-                <input 
-                    type="text" 
-                    id="shareable-link-input" 
-                    value="{shareable_link}" 
-                    readonly 
-                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;"
-                >
-                <button 
-                    id="copy-button" 
-                    onclick="copyLinkToClipboard()"
-                    style="
-                        padding: 8px 12px; 
-                        border-radius: 6px; 
-                        border: 1px solid #ccc;
-                        background-color: #f0f2f6; 
-                        cursor: pointer;
-                        font-size: 14px;
-                        white-space: nowrap;
-                    "
-                >
-                    📋 Copiar Link
-                </button>
-            </div>
-
-            <script>
-            function copyLinkToClipboard() {{
-                // 1. Obter o elemento do input
-                const linkInput = document.getElementById("shareable-link-input");
+                for _, linha_diagrama in tarifarios_diagrama.iterrows():
+                    # Usar a função para obter um nome limpo e fiável
+                    nome_base_diagrama = extrair_nome_base_tarifario(linha_diagrama['NomeParaExibir'])
                 
-                // 2. Selecionar o texto
-                linkInput.select();
-                linkInput.setSelectionRange(0, 99999); // Necessário para telemóveis
+                    # Procurar um par correspondente nos tarifários de perfil
+                    for _, linha_perfil in tarifarios_perfil.iterrows():
+                        nome_base_perfil = extrair_nome_base_tarifario(linha_perfil['NomeParaExibir'])
+                    
+                        if nome_base_diagrama == nome_base_perfil:
+                            custo_real = linha_diagrama['Total (€)']
+                            custo_perfil_erse = linha_perfil['Total (€)']
+                        
+                            if pd.notna(custo_real) and pd.notna(custo_perfil_erse):
+                                diferenca = custo_real - custo_perfil_erse
+                                analise_list.append({
+                                    "Tarifário": nome_base_diagrama, # Usar o nome base limpo
+                                    "Custo com o seu Perfil Real (€)": custo_real,
+                                    "Custo com Perfil Padrão ERSE (€)": custo_perfil_erse,
+                                    "Diferença (€)": diferenca
+                                })
+                                # Sair do loop interno assim que encontrar o par
+                                break
 
-                // 3. Copiar para a área de transferência
-                navigator.clipboard.writeText(linkInput.value).then(() => {{
-                    // 4. Dar feedback ao utilizador
-                    const copyButton = document.getElementById("copy-button");
-                    copyButton.innerText = "Copiado!";
-                    // Voltar ao texto original após 2 segundos
-                    setTimeout(() => {{
-                        copyButton.innerHTML = "&#128203; Copiar Link"; // &#128203; é o emoji da prancheta
-                    }}, 2000);
-                }}).catch(err => {{
-                    console.error('Falha ao copiar o link: ', err);
-                    const copyButton = document.getElementById("copy-button");
-                    copyButton.innerText = "Erro!";
-                }});
-            }}
-            </script>
-            """
-            st.components.v1.html(html_componente_copiar, height=55)
+                if analise_list:
+                    df_analise = pd.DataFrame(analise_list).sort_values(by="Custo com Perfil Padrão ERSE (€)")
+                    
+                    # ### INVERTER A LÓGICA DE CORES ###
+                    def estilo_diferenca_poupanca(val):
+                        if pd.isna(val): return ''
+                        # Valores negativos ou zero (poupança) são verdes. Positivos (custo extra) são vermelhos.
+                        cor = '#28a745' if val <= 0 else '#dc3545'
+                        return f'background-color: {cor}; color: white; font-weight: bold;'
+                    st.dataframe(
+                        df_analise.style.format({
+                            "Custo com o seu Perfil Real (€)": "{:.2f} €",
+                            "Custo com Perfil Padrão ERSE (€)": "{:.2f} €",
+                            "Diferença (€)": "{:+.2f} €"
+                        }).apply(lambda x: [estilo_diferenca_poupanca(v) for v in x], subset=['Diferença (€)']),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    st.caption("Valores negativos na 'Diferença' (verde) significam que o seu perfil é MAIS ECONÓMICO que o padrão.")
+                else:
+                    st.info("Não foi possível encontrar pares de tarifários (Diagrama e Perfil) para comparar com os filtros atuais.")
 
-        else:
-            st.info("Altere um dos parâmetros para gerar um link de partilha.")
+# --- FIM DA SECÇÃO ---
+# ##################################################################
+st.subheader("🔗 Partilhar Simulação")
+
+if st.query_params:
+    base_url = "https://tiagofelicia.streamlit.app/"
+    params_filtrados = {k: v for k, v in st.query_params.items() if v and v != '0'}
+
+    if params_filtrados:
+        query_string = "&".join([f"{k}={v}" for k, v in params_filtrados.items()])
+        shareable_link = f"{base_url}?{query_string}"
+
+        # --- Componente HTML/JS para o campo de texto e botão de copiar ---
+        html_componente_copiar = f"""
+        <div style="display: flex; align-items: center; gap: 8px; font-family: sans-serif;">
+            <input 
+                type="text" 
+                id="shareable-link-input" 
+                value="{shareable_link}" 
+                readonly 
+                style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;"
+            >
+            <button 
+                id="copy-button" 
+                onclick="copyLinkToClipboard()"
+                style="
+                    padding: 8px 12px; 
+                    border-radius: 6px; 
+                    border: 1px solid #ccc;
+                    background-color: #f0f2f6; 
+                    cursor: pointer;
+                    font-size: 14px;
+                    white-space: nowrap;
+                "
+            >
+                📋 Copiar Link
+            </button>
+        </div>
+
+        <script>
+        function copyLinkToClipboard() {{
+            // 1. Obter o elemento do input
+            const linkInput = document.getElementById("shareable-link-input");
+            
+            // 2. Selecionar o texto
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // Necessário para telemóveis
+
+            // 3. Copiar para a área de transferência
+            navigator.clipboard.writeText(linkInput.value).then(() => {{
+                // 4. Dar feedback ao utilizador
+                const copyButton = document.getElementById("copy-button");
+                copyButton.innerText = "Copiado!";
+                // Voltar ao texto original após 2 segundos
+                setTimeout(() => {{
+                    copyButton.innerHTML = "&#128203; Copiar Link"; // &#128203; é o emoji da prancheta
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Falha ao copiar o link: ', err);
+                const copyButton = document.getElementById("copy-button");
+                copyButton.innerText = "Erro!";
+            }});
+        }}
+        </script>
+        """
+        st.components.v1.html(html_componente_copiar, height=55)
+
     else:
-        st.info("Altere um dos parâmetros (Potência, Opção ou Consumos) para gerar um link de partilha.")
+        st.info("Altere um dos parâmetros para gerar um link de partilha.")
+else:
+    st.info("Altere um dos parâmetros (Potência, Opção ou Consumos) para gerar um link de partilha.")
 
-    # ##################################################################
-    # FIM DO BLOCO
-    # ##################################################################
+# ##################################################################
+# FIM DO BLOCO
+# ##################################################################
 
 # Legenda das Colunas da Tabela Tarifários de Eletricidade
 st.markdown("---")
