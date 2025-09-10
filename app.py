@@ -2613,9 +2613,9 @@ if personalizado_ativo:
             st.subheader("Estrutura Simples Personalizada")
             col_s1, col_s2 = st.columns(2)
             with col_s1:
-                st.number_input("Preço Energia Simples (€/kWh)", key="pers_energia_s", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Energia Simples (€/kWh)", key="pers_energia_s", min_value=0.0, step=0.001, format="%g")
             with col_s2:
-                st.number_input("Preço Potência Simples (€/dia)", key="pers_potencia_s", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Potência Simples (€/dia)", key="pers_potencia_s", min_value=0.0, step=0.001, format="%g")
 
     # REGRA 2 E PARTE DA REGRA 3: CAMPOS PARA BI-HORÁRIO
     if opcao_horaria.lower().startswith("bi") or (opcao_horaria.lower().startswith("tri") and potencia <= 20.7):
@@ -2623,11 +2623,11 @@ if personalizado_ativo:
             st.subheader("Estrutura Bi-Horária Personalizada")
             col_b1, col_b2, col_b3 = st.columns(3)
             with col_b1:
-                st.number_input("Preço Vazio Bi-Horário (€/kWh)", key="pers_energia_v_bi", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Vazio Bi-Horário (€/kWh)", key="pers_energia_v_bi", min_value=0.0, step=0.001, format="%g")
             with col_b2:
-                st.number_input("Preço Fora Vazio Bi-Horário (€/kWh)", key="pers_energia_f_bi", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Fora Vazio Bi-Horário (€/kWh)", key="pers_energia_f_bi", min_value=0.0, step=0.001, format="%g")
             with col_b3:
-                st.number_input("Preço Potência Bi-Horário (€/dia)", key="pers_potencia_bi", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Potência Bi-Horário (€/dia)", key="pers_potencia_bi", min_value=0.0, step=0.001, format="%g")
 
     # REGRA 3 E 4: CAMPOS PARA TRI-HORÁRIO
     if opcao_horaria.lower().startswith("tri"):
@@ -2635,13 +2635,13 @@ if personalizado_ativo:
             st.subheader("Estrutura Tri-Horária Personalizada")
             col_t1, col_t2, col_t3, col_t4 = st.columns(4)
             with col_t1:
-                st.number_input("Preço Vazio Tri-Horário (€/kWh)", key="pers_energia_v_tri", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Vazio Tri-Horário (€/kWh)", key="pers_energia_v_tri", min_value=0.0, step=0.001, format="%g")
             with col_t2:
-                st.number_input("Preço Cheias Tri-Horário (€/kWh)", key="pers_energia_c_tri", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Cheias Tri-Horário (€/kWh)", key="pers_energia_c_tri", min_value=0.0, step=0.001, format="%g")
             with col_t3:
-                st.number_input("Preço Ponta Tri-Horário (€/kWh)", key="pers_energia_p_tri", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Ponta Tri-Horário (€/kWh)", key="pers_energia_p_tri", min_value=0.0, step=0.001, format="%g")
             with col_t4:
-                st.number_input("Preço Potência Tri-Horário (€/dia)", key="pers_potencia_tri", min_value=0.0, step=0.001, format="%.4f")
+                st.number_input("Preço Potência Tri-Horário (€/dia)", key="pers_potencia_tri", min_value=0.0, step=0.001, format="%g")
 
     # --- Checkboxes comuns para TAR/TSE do tarifário personalizado ---
     with st.container(border=True):
@@ -2653,10 +2653,10 @@ if personalizado_ativo:
             st.checkbox("TAR incluída na Potência?", value=True, key="pers_tar_potencia")
         with col_opt3:
             st.checkbox("Inclui Financiamento TSE?", value=True, key="pers_tse_incluido")
-    
+
     # --- Botão de cálculo ---
     # ### Lógica do botão "Calcular" ###
-    if st.button("Guardar e Configurar Tarifário Personalizado", key="btn_calc_pers"):
+    if st.button("Guardar e Configurar Tarifário Personalizado", type="primary", key="btn_calc_pers", use_container_width=True):
         # Apenas guarda os dados no session_state. Não faz cálculos aqui.
         st.session_state['dados_tarifario_personalizado'] = {
             'ativo': True,
@@ -5170,7 +5170,7 @@ with st.spinner("A calcular os custos para todos os tarifários... por favor, ag
             preco_potencia_a_usar = dados_pers['precos_s']['potencia']
             consumos_a_usar = {'S': consumos_para_custos.get('Simples', 0)}
         elif opcao_horaria.lower().startswith("bi"):
-            ciclo_a_usar = 'BD' if "Diário" in opcao_horaria.lower() else 'BS'
+            ciclo_a_usar = 'BD' if "diário" in opcao_horaria.lower() else 'BS'
             precos_energia_a_usar = {'V': dados_pers['precos_bi']['vazio'], 'F': dados_pers['precos_bi']['fora_vazio']}
             preco_potencia_a_usar = dados_pers['precos_bi']['potencia']
             consumos_a_usar = {
@@ -5178,7 +5178,7 @@ with st.spinner("A calcular os custos para todos os tarifários... por favor, ag
                 'F': consumos_para_custos.get(ciclo_a_usar, {}).get('F', 0)
             }
         elif opcao_horaria.lower().startswith("tri"):
-            ciclo_a_usar = 'TD' if "Diário" in opcao_horaria.lower() else 'TS'
+            ciclo_a_usar = 'TD' if "diário" in opcao_horaria.lower() else 'TS'
             precos_energia_a_usar = {'V': dados_pers['precos_tri']['vazio'], 'C': dados_pers['precos_tri']['cheias'], 'P': dados_pers['precos_tri']['ponta']}
             preco_potencia_a_usar = dados_pers['precos_tri']['potencia']
             consumos_a_usar = {
@@ -7295,10 +7295,7 @@ if is_diagram_mode:
                 analise_list = []
 
                 for _, linha_diagrama in tarifarios_diagrama.iterrows():
-                    # Usar a função para obter um nome limpo e fiável
                     nome_base_diagrama = extrair_nome_base_tarifario(linha_diagrama['NomeParaExibir'])
-                
-                    # Procurar um par correspondente nos tarifários de perfil
                     for _, linha_perfil in tarifarios_perfil.iterrows():
                         nome_base_perfil = extrair_nome_base_tarifario(linha_perfil['NomeParaExibir'])
                     
@@ -7309,35 +7306,72 @@ if is_diagram_mode:
                             if pd.notna(custo_real) and pd.notna(custo_perfil_erse):
                                 diferenca = custo_real - custo_perfil_erse
                                 analise_list.append({
-                                    "Tarifário": nome_base_diagrama, # Usar o nome base limpo
+                                    "Tarifário": nome_base_diagrama,
                                     "Custo com o seu Perfil Real (€)": custo_real,
                                     "Custo com Perfil Padrão ERSE (€)": custo_perfil_erse,
                                     "Diferença (€)": diferenca
                                 })
-                                # Sair do loop interno assim que encontrar o par
                                 break
 
                 if analise_list:
                     df_analise = pd.DataFrame(analise_list).sort_values(by="Custo com Perfil Padrão ERSE (€)")
                     
-                    # ### INVERTER A LÓGICA DE CORES ###
-                    def estilo_diferenca_poupanca(val):
-                        if pd.isna(val): return ''
-                        # Valores negativos ou zero (poupança) são verdes. Positivos (custo extra) são vermelhos.
-                        cor = '#28a745' if val <= 0 else '#dc3545'
-                        return f'background-color: {cor}; color: white; font-weight: bold;'
-                    st.dataframe(
-                        df_analise.style.format({
-                            "Custo com o seu Perfil Real (€)": "{:.2f} €",
-                            "Custo com Perfil Padrão ERSE (€)": "{:.2f} €",
-                            "Diferença (€)": "{:+.2f} €"
-                        }).apply(lambda x: [estilo_diferenca_poupanca(v) for v in x], subset=['Diferença (€)']),
-                        use_container_width=True,
-                        hide_index=True
+                    # --- INÍCIO DA CONFIGURAÇÃO DA AGGRID ---
+                    gb_analise = GridOptionsBuilder.from_dataframe(df_analise)
+                    
+                    gb_analise.configure_default_column(
+                        sortable=True, resizable=True, wrapHeaderText=True, autoHeaderHeight=True
                     )
+
+                    gb_analise.configure_grid_options(domLayout='autoHeight')
+
+                    formatter_eur_js = JsCode("""
+                        function(params) {
+                            if (params.value === null || params.value === undefined || isNaN(params.value)) { return ''; }
+                            return Number(params.value).toFixed(2) + ' €';
+                        }""")
+
+                    formatter_diff_js = JsCode("""
+                        function(params) {
+                            if (params.value === null || params.value === undefined || isNaN(params.value)) { return ''; }
+                            let value = Number(params.value);
+                            let prefix = value > 0 ? '+' : '';
+                            return prefix + value.toFixed(2) + ' €';
+                        }""")
+                    
+                    cell_style_diferenca_js = JsCode("""
+                        function(params) {
+                            let style = { textAlign: 'center', color: 'white', fontWeight: 'bold' };
+                            if (params.value <= 0) {
+                                style.backgroundColor = '#28a745'; // Verde
+                            } else {
+                                style.backgroundColor = '#dc3545'; // Vermelho
+                            }
+                            return style;
+                        }""")
+
+                    gb_analise.configure_column("Tarifário", headerName="Tarifário", minWidth=300, flex=2, cellStyle={'textAlign': 'center'})
+                    gb_analise.configure_column("Custo com o seu Perfil Real (€)", headerName="Custo Perfil Real (€)", type=["numericColumn"], valueFormatter=formatter_eur_js, minWidth=150, flex=1, cellStyle={'textAlign': 'center'})
+                    gb_analise.configure_column("Custo com Perfil Padrão ERSE (€)", headerName="Custo Perfil Padrão (€)", type=["numericColumn"], valueFormatter=formatter_eur_js, minWidth=150, flex=1, cellStyle={'textAlign': 'center'})
+                    gb_analise.configure_column("Diferença (€)", headerName="Diferença (€)", type=["numericColumn"], valueFormatter=formatter_diff_js, minWidth=130, flex=1, cellStyle=cell_style_diferenca_js)
+
+                    gridOptions_analise = gb_analise.build()
+                    AgGrid(
+                        df_analise,
+                        gridOptions=gridOptions_analise,
+                        custom_css=custom_css, 
+                        fit_columns_on_grid_load=True,
+                        theme='alpine',
+                        allow_unsafe_jscode=True,
+                        key="aggrid_analise_desvios",
+                        enable_enterprise_modules=True
+                    )
+                    # --- FIM DA CONFIGURAÇÃO DA AGGRID ---
+
                     st.caption("Valores negativos na 'Diferença' (verde) significam que o seu perfil é MAIS ECONÓMICO que o padrão.")
                 else:
                     st.info("Não foi possível encontrar pares de tarifários (Diagrama e Perfil) para comparar com os filtros atuais.")
+
 
 # --- FIM DA SECÇÃO ---
 # ##################################################################
