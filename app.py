@@ -74,18 +74,25 @@ def inicializar_estado_e_url():
     # 6. "O Meu Tarifário"
     if st.query_params.get("m_a") == "1":
         st.session_state.chk_meu_tarifario_ativo = True
-        # Preços
-        st.session_state.potencia_meu_input_val = st.query_params.get("m_ps")
-        st.session_state.energia_meu_s_input_val = st.query_params.get("m_es")
-        st.session_state.energia_meu_v_input_val = st.query_params.get("m_ev")
-        st.session_state.energia_meu_f_input_val = st.query_params.get("m_efv")
-        st.session_state.energia_meu_c_input_val = st.query_params.get("m_ec")
-        st.session_state.energia_meu_p_input_val = st.query_params.get("m_ep")
-        # Flags (se o parâmetro for "0", a checkbox fica False, senão fica True)
+        
+        # Função auxiliar para converter para float de forma segura
+        def safe_float_or_none(val):
+            return float(val) if val is not None else None
+
+        # Preços (convertidos para float)
+        st.session_state.potencia_meu_input_val = safe_float_or_none(st.query_params.get("m_ps"))
+        st.session_state.energia_meu_s_input_val = safe_float_or_none(st.query_params.get("m_es"))
+        st.session_state.energia_meu_v_input_val = safe_float_or_none(st.query_params.get("m_ev"))
+        st.session_state.energia_meu_f_input_val = safe_float_or_none(st.query_params.get("m_efv"))
+        st.session_state.energia_meu_c_input_val = safe_float_or_none(st.query_params.get("m_ec"))
+        st.session_state.energia_meu_p_input_val = safe_float_or_none(st.query_params.get("m_ep"))
+        
+        # Flags (lógica original está correta)
         st.session_state.meu_tar_energia_val = st.query_params.get("m_te") != "0"
         st.session_state.meu_tar_potencia_val = st.query_params.get("m_tp") != "0"
         st.session_state.meu_fin_tse_incluido_val = st.query_params.get("m_tse") != "0"
-        # Descontos/Acréscimos
+        
+        # Descontos/Acréscimos (já estavam a ser convertidos, mantemos para consistência)
         st.session_state.meu_desconto_energia_val = float(st.query_params.get("m_de", 0.0))
         st.session_state.meu_desconto_potencia_val = float(st.query_params.get("m_dp", 0.0))
         st.session_state.meu_desconto_fatura_val = float(st.query_params.get("m_df", 0.0))
@@ -7572,7 +7579,7 @@ if not is_diagram_mode:
         params_filtrados = {}
         for k, v in st.query_params.items():
             if v:  # ignora None ou vazio
-                if v == "0" and k not in ("acp", "cont"):
+                if v == "0" and k not in ("acp", "cont", "m_te", "m_tp", "m_tse"):
                     continue  # continua a filtrar zeros de outros parâmetros
                 params_filtrados[k] = v
 
