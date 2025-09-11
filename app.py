@@ -26,6 +26,19 @@ tarifarios_fixos, tarifarios_indexados, OMIE_PERDAS_CICLOS, CONSTANTES = proc_da
 potencias_validas = [1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7, 27.6, 34.5, 41.4]
 opcoes_horarias_existentes = list(tarifarios_fixos['opcao_horaria_e_ciclo'].dropna().unique())
 
+# --- Mapas para encurtar os parâmetros do URL ---
+MAPA_OH_PARA_URL = {
+    "Simples": "S",
+    "Bi-horário - Ciclo Diário": "BD",
+    "Bi-horário - Ciclo Semanal": "BS",
+    "Tri-horário - Ciclo Diário": "TD",
+    "Tri-horário - Ciclo Semanal": "TS",
+    "Tri-horário > 20.7 kVA - Ciclo Diário": "TD-A",
+    "Tri-horário > 20.7 kVA - Ciclo Semanal": "TS-A",
+}
+# Cria o dicionário inverso automaticamente para ler os URLs
+MAPA_URL_PARA_OH = {v: k for k, v in MAPA_OH_PARA_URL.items()}
+
 #Funções
 def inicializar_estado_e_url():
     """
@@ -36,18 +49,21 @@ def inicializar_estado_e_url():
         return
 
     # 1. Potência
-    potencia_no_url = st.query_params.get("potencia_url")
+    potencia_no_url = st.query_params.get("p") # Alterado de "potencia_url"
     if potencia_no_url and float(potencia_no_url) in potencias_validas:
         st.session_state.sel_potencia = float(potencia_no_url)
     else:
         st.session_state.sel_potencia = 3.45
 
     # 2. Opção Horária
-    oh_no_url = st.query_params.get("oh_url")
-    if oh_no_url and oh_no_url in opcoes_horarias_existentes:
-        st.session_state.sel_opcao_horaria = oh_no_url
+    oh_codigo_url = st.query_params.get("oh") # Alterado de "oh_url"
+    oh_nome_longo = MAPA_URL_PARA_OH.get(oh_codigo_url) # Traduz o código para o nome completo
+
+    if oh_nome_longo and oh_nome_longo in opcoes_horarias_existentes:
+        st.session_state.sel_opcao_horaria = oh_nome_longo
     else:
         st.session_state.sel_opcao_horaria = "Simples"
+
 
     # 3. Mês
     if "sel_mes" not in st.session_state:
@@ -114,7 +130,11 @@ def atualizar_url_potencia():
     # --- Parte 1: Atualizar o URL da potência ---
     potencia_selecionada = st.session_state.get("sel_potencia")
     if potencia_selecionada:
-        st.query_params["potencia_url"] = str(potencia_selecionada)
+        # Limpa a chave antiga, se existir
+        if "potencia_url" in st.query_params:
+            del st.query_params["potencia_url"]
+        # Adiciona a nova chave curta
+        st.query_params["p"] = str(potencia_selecionada)
 
     # --- Parte 2: Lógica de Sincronização ---
     opcao_atual = st.session_state.get("sel_opcao_horaria")
@@ -170,7 +190,14 @@ def atualizar_url_opcao_horaria():
 
     # --- 2. AGORA, ATUALIZAR O URL COM O ESTADO JÁ CORRIGIDO ---
     if opcao_selecionada:
-        st.query_params["oh_url"] = opcao_selecionada
+        # Traduz o nome completo para o código curto
+        codigo_oh = MAPA_OH_PARA_URL.get(opcao_selecionada)
+        if codigo_oh:
+            # Limpa a chave antiga, se existir
+            if "oh_url" in st.query_params:
+                del st.query_params["oh_url"]
+            # Adiciona a nova chave curta
+            st.query_params["oh"] = codigo_oh
     
     # Esta função agora usará os valores que acabámos de definir.
     atualizar_url_consumos()
