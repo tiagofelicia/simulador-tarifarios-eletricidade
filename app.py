@@ -30,10 +30,10 @@ opcoes_horarias_existentes = list(tarifarios_fixos['opcao_horaria_e_ciclo'].drop
 def inicializar_estado_e_url():
     """
     Verifica e inicializa o st.session_state, dando prioridade a valores no URL.
-    Corre apenas uma vez por sessão.
+    Corre apenas uma vez por sessão, centralizando toda a lógica de arranque.
     """
     if 'estado_inicializado' in st.session_state:
-        return # Já foi inicializado, não faz mais nada
+        return
 
     # 1. Potência
     potencia_no_url = st.query_params.get("potencia_url")
@@ -49,39 +49,269 @@ def inicializar_estado_e_url():
     else:
         st.session_state.sel_opcao_horaria = "Simples"
 
-    # 3. Consumos
-    # Escrevemos os valores nas chaves corretas (exp_consumo_...)
+    # 3. Mês
+    if "sel_mes" not in st.session_state:
+        meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+        mes_atual_idx = datetime.datetime.now().month - 1
+        st.session_state.sel_mes = meses[mes_atual_idx]
+
+    # 4. Consumos
     st.session_state.exp_consumo_s = st.query_params.get("c_s", "158")
     st.session_state.exp_consumo_v = st.query_params.get("c_v", "63")
     st.session_state.exp_consumo_f = st.query_params.get("c_fv", "95")
     st.session_state.exp_consumo_c = st.query_params.get("c_c", "68")
     st.session_state.exp_consumo_p = st.query_params.get("c_p", "27")
-    
-    st.session_state.estado_inicializado = True # Marca como inicializado
+
+    # 5. Opções Adicionais
+    st.session_state.chk_tarifa_social = st.query_params.get("ts") == "1"
+    st.session_state.chk_familia_numerosa = st.query_params.get("fn") == "1"
+    st.session_state.dgeg_input = float(st.query_params.get("dgeg", 0.07))
+    st.session_state.cav_input = float(st.query_params.get("cav", 2.85))
+    # Se o parâmetro for "0", a checkbox fica False, senão fica com o seu default (True)
+    st.session_state.chk_acp = st.query_params.get("acp") != "0"
+    st.session_state.chk_continente = st.query_params.get("cont") != "0"
+
+    # 6. "O Meu Tarifário"
+    if st.query_params.get("m_a") == "1":
+        st.session_state.chk_meu_tarifario_ativo = True
+        # Preços
+        st.session_state.potencia_meu_input_val = st.query_params.get("m_ps")
+        st.session_state.energia_meu_s_input_val = st.query_params.get("m_es")
+        st.session_state.energia_meu_v_input_val = st.query_params.get("m_ev")
+        st.session_state.energia_meu_f_input_val = st.query_params.get("m_efv")
+        st.session_state.energia_meu_c_input_val = st.query_params.get("m_ec")
+        st.session_state.energia_meu_p_input_val = st.query_params.get("m_ep")
+        # Flags (se o parâmetro for "0", a checkbox fica False, senão fica True)
+        st.session_state.meu_tar_energia_val = st.query_params.get("m_te") != "0"
+        st.session_state.meu_tar_potencia_val = st.query_params.get("m_tp") != "0"
+        st.session_state.meu_fin_tse_incluido_val = st.query_params.get("m_tse") != "0"
+        # Descontos/Acréscimos
+        st.session_state.meu_desconto_energia_val = float(st.query_params.get("m_de", 0.0))
+        st.session_state.meu_desconto_potencia_val = float(st.query_params.get("m_dp", 0.0))
+        st.session_state.meu_desconto_fatura_val = float(st.query_params.get("m_df", 0.0))
+        st.session_state.meu_acrescimo_fatura_val = float(st.query_params.get("m_af", 0.0))
+
+    st.session_state.estado_inicializado = True
 
 inicializar_estado_e_url()
 
 def atualizar_url_potencia():
-    """Callback para atualizar o URL quando a potência muda."""
+    """
+    Callback para atualizar o URL quando a potência muda e para sincronizar
+    os consumos se a opção horária for forçada a mudar.
+    """
+    # Guarda: Se estiver em modo diagrama, não faz nada.
+    if 'dados_completos_ficheiro' in st.session_state and st.session_state.get('dados_completos_ficheiro') is not None:
+        return
+    
+    # --- Parte 1: Atualizar o URL da potência ---
     potencia_selecionada = st.session_state.get("sel_potencia")
     if potencia_selecionada:
         st.query_params["potencia_url"] = str(potencia_selecionada)
 
+    # --- Parte 2: Lógica de Sincronização ---
+    opcao_atual = st.session_state.get("sel_opcao_horaria")
+
+    # Replicamos a lógica que filtra as opções horárias válidas
+    if potencia_selecionada >= 27.6:
+        opcoes_validas_novas = [o for o in opcoes_horarias_existentes if "Tri-horário > 20.7 kVA" in o]
+    else:
+        opcoes_validas_novas = [o for o in opcoes_horarias_existentes if not "Tri-horário > 20.7 kVA" in o]
+
+    # Se a opção horária atual já não é válida, sabemos que ela vai mudar.
+    if opcao_atual not in opcoes_validas_novas and opcoes_validas_novas:
+        # A nova opção será a primeira da lista.
+        nova_opcao_horaria = opcoes_validas_novas[0]
+        
+        # Atualizamos o estado da sessão para a nova opção.
+        st.session_state.sel_opcao_horaria = nova_opcao_horaria
+        
+        # Agora, chamamos manualmente o callback da opção horária.
+        # Ele já tem toda a lógica correta para repor os consumos e atualizar o URL.
+        atualizar_url_opcao_horaria()
+
 def atualizar_url_opcao_horaria():
-    """Callback para atualizar o URL quando a opção horária muda."""
+    """
+    Callback para atualizar o URL e o estado dos consumos quando a opção horária muda.
+    """
+    # Se estiver em modo diagrama, não faz nada.
+    if 'dados_completos_ficheiro' in st.session_state and st.session_state.get('dados_completos_ficheiro') is not None:
+        return
+    
     opcao_selecionada = st.session_state.get("sel_opcao_horaria")
+
+    # --- 1. ATUALIZAR O ESTADO DA SESSÃO PRIMEIRO ---
+    # Esta lógica foi movida do corpo principal do script para aqui.
+    if opcao_selecionada.lower() == "simples":
+        st.session_state.exp_consumo_s = "158"
+        st.session_state.exp_consumo_v = "0"
+        st.session_state.exp_consumo_f = "0"
+        st.session_state.exp_consumo_c = "0"
+        st.session_state.exp_consumo_p = "0"
+    elif opcao_selecionada.lower().startswith("bi"):
+        st.session_state.exp_consumo_s = "0"
+        st.session_state.exp_consumo_v = "63"
+        st.session_state.exp_consumo_f = "95"
+        st.session_state.exp_consumo_c = "0"
+        st.session_state.exp_consumo_p = "0"
+    elif opcao_selecionada.lower().startswith("tri"):
+        st.session_state.exp_consumo_s = "0"
+        st.session_state.exp_consumo_v = "63"
+        st.session_state.exp_consumo_f = "0"
+        st.session_state.exp_consumo_c = "68"
+        st.session_state.exp_consumo_p = "27"
+
+    # --- 2. AGORA, ATUALIZAR O URL COM O ESTADO JÁ CORRIGIDO ---
     if opcao_selecionada:
         st.query_params["oh_url"] = opcao_selecionada
+    
+    # Esta função agora usará os valores que acabámos de definir.
+    atualizar_url_consumos()
+
+    # Também chamar a atualização do "Meu Tarifário" para limpar parâmetros
+    # de energia que possam ter ficado do modo anterior.
+    atualizar_url_meu_tarifario()
+
+def atualizar_url_opcoes_adicionais():
+    """Callback para monitorizar e atualizar o URL com todas as opções adicionais."""
+    # Guarda: Se estiver em modo diagrama, não faz nada.
+    if 'dados_completos_ficheiro' in st.session_state and st.session_state.get('dados_completos_ficheiro') is not None:
+        return
+
+    # Lógica para Tarifa Social e Família Numerosa
+    if st.session_state.get("chk_tarifa_social", False):
+        st.query_params["ts"] = "1"
+    elif "ts" in st.query_params:
+        del st.query_params["ts"]
+
+    if st.session_state.get("chk_familia_numerosa", False):
+        st.query_params["fn"] = "1"
+    elif "fn" in st.query_params:
+        del st.query_params["fn"]
+
+    # Lógica para DGEG e CAV
+    dgeg_default = 0.07
+    if st.session_state.get("dgeg_input", dgeg_default) != dgeg_default:
+        st.query_params["dgeg"] = str(st.session_state.dgeg_input)
+    elif "dgeg" in st.query_params:
+        del st.query_params["dgeg"]
+
+    cav_default = 2.85
+    if st.session_state.get("cav_input", cav_default) != cav_default:
+        st.query_params["cav"] = str(st.session_state.cav_input)
+    elif "cav" in st.query_params:
+        del st.query_params["cav"]
+
+    # Lógica para Quota ACP e Desconto Continente
+    # Como o padrão é True, só guardamos no URL se o valor for False ("0")
+    if not st.session_state.get("chk_acp", True):
+        st.query_params["acp"] = "0"
+    elif "acp" in st.query_params:
+        del st.query_params["acp"]
+
+    if not st.session_state.get("chk_continente", True):
+        st.query_params["cont"] = "0"
+    elif "cont" in st.query_params:
+        del st.query_params["cont"]
+
+def atualizar_url_meu_tarifario():
+    """Callback para monitorizar e atualizar o URL com os dados do Meu Tarifário."""
+    # Se estiver em modo diagrama, não faz nada.
+    if 'dados_completos_ficheiro' in st.session_state and st.session_state.get('dados_completos_ficheiro') is not None:
+        return
+    
+    # Lista de todas as chaves possíveis para o Meu Tarifário no URL
+    chaves_meu_tar_url = [
+        "m_a", "m_ps", "m_es", "m_ev", "m_efv", "m_ec", "m_ep",
+        "m_te", "m_tp", "m_tse", "m_de", "m_dp", "m_df", "m_af"
+    ]
+    
+    # Limpar sempre as chaves antigas
+    for chave in chaves_meu_tar_url:
+        if chave in st.query_params:
+            del st.query_params[chave]
+
+    # Se a secção "Meu Tarifário" não estiver ativa, não fazemos mais nada
+    if not st.session_state.get("chk_meu_tarifario_ativo", False):
+        return
+
+    # Se estiver ativa, adicionamos a flag e os preços relevantes
+    st.query_params["m_a"] = "1" # 'm_a' significa 'meu_ativo'
+    
+    opcao_selecionada = st.session_state.get("sel_opcao_horaria", "Simples").lower()
+    
+    # Preços de energia e potência (lógica existente)
+    potencia_val = st.session_state.get("potencia_meu_input_val", 0.0)
+    if potencia_val: st.query_params["m_ps"] = str(potencia_val)
+    
+    if "simples" in opcao_selecionada:
+        energia_s_val = st.session_state.get("energia_meu_s_input_val", 0.0)
+        if energia_s_val: st.query_params["m_es"] = str(energia_s_val)
+    elif opcao_selecionada.startswith("bi"):
+        energia_v_val = st.session_state.get("energia_meu_v_input_val", 0.0)
+        energia_f_val = st.session_state.get("energia_meu_f_input_val", 0.0)
+        if energia_v_val: st.query_params["m_ev"] = str(energia_v_val)
+        if energia_f_val: st.query_params["m_efv"] = str(energia_f_val)
+    elif opcao_selecionada.startswith("tri"):
+        energia_v_val = st.session_state.get("energia_meu_v_input_val", 0.0)
+        energia_c_val = st.session_state.get("energia_meu_c_input_val", 0.0)
+        energia_p_val = st.session_state.get("energia_meu_p_input_val", 0.0)
+        if energia_v_val: st.query_params["m_ev"] = str(energia_v_val)
+        if energia_c_val: st.query_params["m_ec"] = str(energia_c_val)
+        if energia_p_val: st.query_params["m_ep"] = str(energia_p_val)
+
+    # Adicionar as flags e os descontos/acréscimos
+    # Para as checkboxes, que por defeito são True, só guardamos no URL se forem False (valor "0")
+    if not st.session_state.get("meu_tar_energia_val", True):
+        st.query_params["m_te"] = "0"
+    if not st.session_state.get("meu_tar_potencia_val", True):
+        st.query_params["m_tp"] = "0"
+    if not st.session_state.get("meu_fin_tse_incluido_val", True):
+        st.query_params["m_tse"] = "0"
+
+    # Para os campos numéricos, que por defeito são 0, só guardamos se tiverem um valor > 0
+    desconto_energia_val = st.session_state.get("meu_desconto_energia_val", 0.0)
+    if desconto_energia_val: st.query_params["m_de"] = str(desconto_energia_val)
+    
+    desconto_potencia_val = st.session_state.get("meu_desconto_potencia_val", 0.0)
+    if desconto_potencia_val: st.query_params["m_dp"] = str(desconto_potencia_val)
+
+    desconto_fatura_val = st.session_state.get("meu_desconto_fatura_val", 0.0)
+    if desconto_fatura_val: st.query_params["m_df"] = str(desconto_fatura_val)
+    
+    acrescimo_fatura_val = st.session_state.get("meu_acrescimo_fatura_val", 0.0)
+    if acrescimo_fatura_val: st.query_params["m_af"] = str(acrescimo_fatura_val)
+
 
 def atualizar_url_consumos():
-    """Callback para atualizar o URL quando os consumos manuais mudam."""
-    # Lê das chaves de sessão dos text_input (ex: 'exp_consumo_s')
-    # Garante que não guarda um URL com 'None' se a chave não existir
-    st.query_params["c_s"] = st.session_state.get("exp_consumo_s", "0")
-    st.query_params["c_v"] = st.session_state.get("exp_consumo_v", "0")
-    st.query_params["c_fv"] = st.session_state.get("exp_consumo_f", "0")
-    st.query_params["c_c"] = st.session_state.get("exp_consumo_c", "0")
-    st.query_params["c_p"] = st.session_state.get("exp_consumo_p", "0")
+    """
+    Callback para atualizar o URL apenas com os consumos relevantes
+    para a opção horária selecionada, limpando os restantes.
+    """
+    # Se estiver em modo diagrama, não faz nada.
+    if 'dados_completos_ficheiro' in st.session_state and st.session_state.get('dados_completos_ficheiro') is not None:
+        return
+    
+    opcao_selecionada = st.session_state.get("sel_opcao_horaria", "Simples").lower()
+    
+    # Lista de todas as chaves de consumo possíveis no URL
+    chaves_consumo_url = ["c_s", "c_v", "c_fv", "c_c", "c_p"]
+
+    # Limpar todas as chaves de consumo existentes para começar do zero
+    for chave in chaves_consumo_url:
+        if chave in st.query_params:
+            del st.query_params[chave]
+
+    # Adicionar apenas as chaves relevantes para a opção atual
+    if "simples" in opcao_selecionada:
+        st.query_params["c_s"] = st.session_state.get("exp_consumo_s", "0")
+    elif opcao_selecionada.startswith("bi"):
+        st.query_params["c_v"] = st.session_state.get("exp_consumo_v", "0")
+        st.query_params["c_fv"] = st.session_state.get("exp_consumo_f", "0")
+    elif opcao_selecionada.startswith("tri"):
+        st.query_params["c_v"] = st.session_state.get("exp_consumo_v", "0")
+        st.query_params["c_c"] = st.session_state.get("exp_consumo_c", "0")
+        st.query_params["c_p"] = st.session_state.get("exp_consumo_p", "0")
 
 # FUNÇÃO criar_tabela_analise_completa_html
 def criar_tabela_analise_completa_html(consumos_agregados, omie_agregados):
@@ -276,13 +506,9 @@ def reiniciar_simulador():
 
     # 4. Repor as checkboxes de opções adicionais
     st.session_state.chk_tarifa_social = False
-    st.session_state.chk_tarifa_social_val = False
     st.session_state.chk_familia_numerosa = False
-    st.session_state.chk_familia_numerosa_val = False
     st.session_state.chk_acp = True
-    st.session_state.incluir_quota_acp_val = True
     st.session_state.chk_continente = True
-    st.session_state.desconto_continente_val = True
     st.session_state.chk_modo_comparacao_opcoes = False
             
     # 6. Repor os filtros da tabela
@@ -304,32 +530,6 @@ FINANCIAMENTO_TSE_VAL = calc.obter_constante("Financiamento_TSE", CONSTANTES)
 
 # --- Obter valor constante da Quota ACP ---
 VALOR_QUOTA_ACP_MENSAL = calc.obter_constante("Quota_ACP", CONSTANTES)
-
-def inicializar_estado():
-    """
-    Verifica e inicializa os valores no st.session_state se ainda não existirem.
-    Isto garante que os valores padrão são definidos apenas uma vez por sessão.
-    """
-    # Valores padrão para os seletores principais
-    if "sel_potencia" not in st.session_state:
-        st.session_state.sel_potencia = 3.45
-
-    if "sel_opcao_horaria" not in st.session_state:
-        st.session_state.sel_opcao_horaria = "Simples"
-
-    if "sel_mes" not in st.session_state:
-        meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-        mes_atual_idx = datetime.datetime.now().month - 1
-        st.session_state.sel_mes = meses[mes_atual_idx]
-    
-    # Podem-se adicionar outras inicializações aqui se necessário
-    if "chk_tarifa_social_val" not in st.session_state:
-        st.session_state.chk_tarifa_social_val = False
-    
-    if "chk_familia_numerosa_val" not in st.session_state:
-        st.session_state.chk_familia_numerosa_val = False
-
-inicializar_estado()
 
 def preparar_dados_para_graficos(df_consumos_filtrado, df_omie_filtrado, opcao_horaria_selecionada, dias_periodo):
     """
@@ -950,31 +1150,7 @@ with col2:
         on_change=atualizar_url_opcao_horaria
     )
 
-# --- LÓGICA DE RESET DOS CONSUMOS ---
-if 'last_opcao_horaria_for_consumo_calc' not in st.session_state:
-    st.session_state.last_opcao_horaria_for_consumo_calc = opcao_horaria
-elif st.session_state.get('last_opcao_horaria_for_consumo_calc') != opcao_horaria:
-    st.session_state.last_opcao_horaria_for_consumo_calc = opcao_horaria
-    
-    # Simplesmente definimos os novos valores padrão, sem apagar chaves e sem st.rerun()
-    if opcao_horaria.lower() == "simples":
-        st.session_state.exp_consumo_s = "158"
-        st.session_state.exp_consumo_v = "0"
-        st.session_state.exp_consumo_f = "0"
-        st.session_state.exp_consumo_c = "0"
-        st.session_state.exp_consumo_p = "0"
-    elif opcao_horaria.lower().startswith("bi"):
-        st.session_state.exp_consumo_s = "0"
-        st.session_state.exp_consumo_v = "63"
-        st.session_state.exp_consumo_f = "95"
-        st.session_state.exp_consumo_c = "0"
-        st.session_state.exp_consumo_p = "0"
-    elif opcao_horaria.lower().startswith("tri"):
-        st.session_state.exp_consumo_s = "0"
-        st.session_state.exp_consumo_v = "63"
-        st.session_state.exp_consumo_f = "0"
-        st.session_state.exp_consumo_c = "68"
-        st.session_state.exp_consumo_p = "27"
+
 
 # --- CAMPO DE PARTILHA POR URL ---
 
@@ -1017,6 +1193,8 @@ if uploaded_files:
                 st.session_state.chave_ficheiros_processados = chave_ficheiros_atuais
                 st.session_state.nomes_ficheiros_processados = ", ".join([f.name for f in uploaded_files])
                 
+                # Limpar os parâmetros do URL ao entrar em modo diagrama
+                st.query_params.clear()
 
 # Se não há ficheiros, mas havia antes, limpar o estado
 elif not uploaded_files and 'dados_completos_ficheiro' in st.session_state:
@@ -2016,38 +2194,38 @@ with st.expander("➕ Opções Adicionais de Simulação (Tarifa Social e condic
         valor_dgeg_user = st.number_input(
             "Valor DGEG (€/mês)",
             min_value=0.0, step=0.01, value=0.07, # Mantém os teus defaults
-            help="Taxa de Exploração da Direção-Geral de Energia e Geologia - Verifique qual o valor cobrado na sua fatura. Em condições normais, para contratos domésticos o valor é de 0,07 €/mês e os não domésticos têm o valor de 0,35 €/mês."
+            help="Taxa de Exploração da Direção-Geral de Energia e Geologia - Verifique qual o valor cobrado na sua fatura. Em condições normais, para contratos domésticos o valor é de 0,07 €/mês e os não domésticos têm o valor de 0,35 €/mês.",
+            key="dgeg_input",
+            on_change=atualizar_url_opcoes_adicionais
         )
     with col_taxa2:
         valor_cav_user = st.number_input(
             "Valor Contribuição Audiovisual (€/mês)",
             min_value=0.0, step=0.01, value=2.85, # Mantém os teus defaults
-            help="Contribuição Audiovisual (CAV) - Verifique qual o valor cobrado na sua fatura. O valor normal é de 2,85 €/mês. Será 1 €/mês, para alguns casos de Tarifa Social (1º escalão de abono...) Será 0 €/mês, para consumo inferior a 400 kWh/ano."
+            help="Contribuição Audiovisual (CAV) - Verifique qual o valor cobrado na sua fatura. O valor normal é de 2,85 €/mês. Será 1 €/mês, para alguns casos de Tarifa Social (1º escalão de abono...) Será 0 €/mês, para consumo inferior a 400 kWh/ano.",
+            key="cav_input",
+            on_change=atualizar_url_opcoes_adicionais
         )
     
     # --- MOSTRAR BENEFÍCIOS APENAS SE POTÊNCIA PERMITE ---
-    if potencia <= 6.9:  # <--- CONDIÇÃO ADICIONADA AQUI
+    if potencia <= 6.9:  # <--- CONDIÇÃO AQUI
         st.markdown(r"##### Benefícios e Condições Especiais (para potências $\leq 6.9$ kVA)") # Título condicional
         colx1, colx2 = st.columns(2)
         with colx1:
-            # A condição interna "if potencia <= 6.9" na checkbox já não é estritamente necessária
-            # pois já estamos dentro de um bloco if potencia <= 6.9, mas não faz mal mantê-la por clareza.
-            tarifa_social = st.checkbox("Tarifa Social", value=st.session_state.get("chk_tarifa_social_val", False), help="Só pode ter Tarifa Social para potências até 6.9 kVA", key="chk_tarifa_social")
-            st.session_state["chk_tarifa_social_val"] = tarifa_social # Guardar estado
+            tarifa_social = st.checkbox("Tarifa Social",
+                                        key="chk_tarifa_social",
+                                        help="Só pode ter Tarifa Social para potências até 6.9 kVA",
+                                        on_change=atualizar_url_opcoes_adicionais)
         with colx2:
-            familia_numerosa = st.checkbox("Família Numerosa", value=st.session_state.get("chk_familia_numerosa_val", False), help="300 kWh com IVA a 6% (em vez dos normais 200 kWh) para potências até 6.9 kVA", key="chk_familia_numerosa")
-            st.session_state["chk_familia_numerosa_val"] = familia_numerosa # Guardar estado
+            familia_numerosa = st.checkbox("Família Numerosa",
+                                        key="chk_familia_numerosa",
+                                        help="300 kWh com IVA a 6% (em vez dos normais 200 kWh) para potências até 6.9 kVA",
+                                        on_change=atualizar_url_opcoes_adicionais)
     else:
-        # Se potencia > 6.9, garantir que as variáveis têm um valor (False)
-        # e opcionalmente limpar o estado das checkboxes se estavam ativas
         tarifa_social = False
         familia_numerosa = False
-        if st.session_state.get("chk_tarifa_social_val", False): # Se estava True e agora a secção não aparece
-            st.session_state.chk_tarifa_social_val = False
-            # st.info("Tarifa Social desativada devido à potência selecionada (> 6.9 kVA).") # Mensagem pode ser mostrada fora do if, se desejado.
-        if st.session_state.get("chk_familia_numerosa_val", False):
-            st.session_state.chk_familia_numerosa_val = False
-            # st.info("Benefício de Família Numerosa desativado devido à potência selecionada (> 6.9 kVA).")
+        st.session_state.chk_tarifa_social = False
+        st.session_state.chk_familia_numerosa = False
 
     # --- CONDIÇÕES PARA ACP E CONTINENTE (dentro do expander) ---
     mostrar_widgets_acp_continente = False
@@ -2055,21 +2233,28 @@ with st.expander("➕ Opções Adicionais de Simulação (Tarifa Social e condic
         if opcao_horaria.lower() == "simples" or opcao_horaria.lower().startswith("bi"):
             mostrar_widgets_acp_continente = True
 
-    # Inicializar as variáveis para garantir que existem mesmo se a condição acima for falsa
-    # e os widgets não forem mostrados. Os valores virão do session_state ou do default da checkbox.
-    incluir_quota_acp = st.session_state.get('incluir_quota_acp_val', True)
-    desconto_continente = st.session_state.get('desconto_continente_val', True)
-
     if mostrar_widgets_acp_continente:
         st.markdown("##### Parcerias e Descontos Específicos")
         colx3, colx4 = st.columns(2)
         with colx3:
-            incluir_quota_acp = st.checkbox("Incluir Quota ACP", value=st.session_state.get('incluir_quota_acp_val', True), key='chk_acp', help="Inclui o valor da quota do ACP (4,80 €/mês) no valor do tarifário da parceria GE/ACP")
-            st.session_state['incluir_quota_acp_val'] = incluir_quota_acp
+            # Padrão simplificado
+            incluir_quota_acp = st.checkbox(
+                "Incluir Quota ACP",
+                key='chk_acp',
+                help="Inclui o valor da quota do ACP (4,80 €/mês) no valor do tarifário da parceria GE/ACP",
+                on_change=atualizar_url_opcoes_adicionais
+            )
         with colx4:
-            desconto_continente = st.checkbox("Desconto Continente", value=st.session_state.get('desconto_continente_val', True), key='chk_continente', help="Comparar o custo total incluindo o desconto do valor do cupão Continente no tarifário Galp&Continente")
-            st.session_state['desconto_continente_val'] = desconto_continente
-    # else: as variáveis incluir_quota_acp e desconto_continente já foram inicializadas com os valores do session_state ou default
+            # Padrão simplificado
+            desconto_continente = st.checkbox(
+                "Desconto Continente",
+                key='chk_continente',
+                help="Comparar o custo total incluindo o desconto do valor do cupão Continente no tarifário Galp&Continente",
+                on_change=atualizar_url_opcoes_adicionais
+            )
+    else:
+        incluir_quota_acp = st.session_state.get('chk_acp', True)
+        desconto_continente = st.session_state.get('chk_continente', True)
 
     # O título mantém-se para organização visual
     #st.markdown("##### Comparação Tarifários Indexados")
@@ -2087,7 +2272,8 @@ Para preencher os valores de acordo com o seu tarifário, ou com outro qualquer 
 meu_tarifario_ativo = st.checkbox(
     "**Comparar com O Meu Tarifário?**",
     key="chk_meu_tarifario_ativo",
-    help=help_O_Meu_Tarifario
+    help=help_O_Meu_Tarifario,
+    on_change=atualizar_url_meu_tarifario
 )
 
 # Criação de todos_omie_inputs_utilizador_comp
@@ -2156,59 +2342,59 @@ if meu_tarifario_ativo:
     if opcao_horaria.lower() == "simples":
         with col_user1:
             energia_meu = st.number_input("Preço Energia (€/kWh)", min_value=0.0, step=0.001, format="%g",
-                                        value=st.session_state.get(key_energia_meu_s, None), key=key_energia_meu_s)
+                                        value=st.session_state.get(key_energia_meu_s, None), key=key_energia_meu_s, on_change=atualizar_url_meu_tarifario)
         with col_user2:
             potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.001, format="%g",
-                                         value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu)
+                                         value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu, on_change=atualizar_url_meu_tarifario)
     elif opcao_horaria.lower().startswith("bi"):
         with col_user1:
             energia_vazio_meu = st.number_input("Preço Vazio (€/kWh)", min_value=0.0, step=0.001, format="%g",
-                                              value=st.session_state.get(key_energia_meu_v, None), key=key_energia_meu_v)
+                                              value=st.session_state.get(key_energia_meu_v, None), key=key_energia_meu_v, on_change=atualizar_url_meu_tarifario)
         with col_user2:
             energia_fora_vazio_meu = st.number_input("Preço Fora Vazio (€/kWh)", min_value=0.0, step=0.001, format="%g",
-                                                   value=st.session_state.get(key_energia_meu_f, None), key=key_energia_meu_f)
+                                                   value=st.session_state.get(key_energia_meu_f, None), key=key_energia_meu_f, on_change=atualizar_url_meu_tarifario)
         with col_user3:
             potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.001, format="%g",
-                                         value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu)
+                                         value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu, on_change=atualizar_url_meu_tarifario)
     elif opcao_horaria.lower().startswith("tri"):
         with col_user1:
             energia_vazio_meu = st.number_input("Preço Vazio (€/kWh)", min_value=0.0, step=0.001, format="%g",
-                                              value=st.session_state.get(key_energia_meu_v, None), key=key_energia_meu_v)
+                                              value=st.session_state.get(key_energia_meu_v, None), key=key_energia_meu_v, on_change=atualizar_url_meu_tarifario)
         with col_user2:
             energia_cheias_meu = st.number_input("Preço Cheias (€/kWh)", min_value=0.0, step=0.001, format="%g",
-                                               value=st.session_state.get(key_energia_meu_c, None), key=key_energia_meu_c)
+                                               value=st.session_state.get(key_energia_meu_c, None), key=key_energia_meu_c, on_change=atualizar_url_meu_tarifario)
         with col_user3:
             energia_ponta_meu = st.number_input("Preço Ponta (€/kWh)", min_value=0.0, step=0.001, format="%g",
-                                              value=st.session_state.get(key_energia_meu_p, None), key=key_energia_meu_p)
+                                              value=st.session_state.get(key_energia_meu_p, None), key=key_energia_meu_p, on_change=atualizar_url_meu_tarifario)
         with col_user4:
             potencia_meu = st.number_input("Preço Potência (€/dia)", min_value=0.0, step=0.001, format="%g",
-                                         value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu)
+                                         value=st.session_state.get(key_potencia_meu, None), key=key_potencia_meu, on_change=atualizar_url_meu_tarifario)
 
     col_userx1, col_userx2, col_userx3 = st.columns(3)
     with col_userx1:
-        tar_incluida_energia_meu = st.checkbox("TAR incluída na Energia?", value=st.session_state.get(key_meu_tar_energia, True), key=key_meu_tar_energia, help="É muito importante saber se os valores têm ou não as TAR (Tarifas de Acesso às Redes). Alguns comercializadores separam na fatura, outros não. Verifique se há alguma referência a Acesso às Redes na fatura em (€/kWh)")
+        tar_incluida_energia_meu = st.checkbox("TAR incluída na Energia?", value=st.session_state.get(key_meu_tar_energia, True), key=key_meu_tar_energia, help="É muito importante saber se os valores têm ou não as TAR (Tarifas de Acesso às Redes). Alguns comercializadores separam na fatura, outros não. Verifique se há alguma referência a Acesso às Redes na fatura em (€/kWh)", on_change=atualizar_url_meu_tarifario)
     with col_userx2:
-        tar_incluida_potencia_meu = st.checkbox("TAR incluída na Potência?", value=st.session_state.get(key_meu_tar_potencia, True), key=key_meu_tar_potencia, help="É muito importante saber se os valores têm ou não as TAR (Tarifas de Acesso às Redes). Alguns comercializadores separam na fatura, outros não. Verifique se há alguma referência a Acesso às Redes na fatura em (€/dia)")
+        tar_incluida_potencia_meu = st.checkbox("TAR incluída na Potência?", value=st.session_state.get(key_meu_tar_potencia, True), key=key_meu_tar_potencia, help="É muito importante saber se os valores têm ou não as TAR (Tarifas de Acesso às Redes). Alguns comercializadores separam na fatura, outros não. Verifique se há alguma referência a Acesso às Redes na fatura em (€/dia)", on_change=atualizar_url_meu_tarifario)
     with col_userx3:
         # A checkbox "Inclui Financiamento TSE?" guarda True se ESTIVER incluído.
         # A variável 'adicionar_financiamento_tse_meu' é o inverso.
-        checkbox_tse_incluido_estado = st.checkbox("Inclui Financiamento TSE?", value=st.session_state.get(key_meu_fin_tse_incluido, True), key=key_meu_fin_tse_incluido, help="É importante saber se os valores têm ou não incluido o financiamento da Tarifa Social de Eletricidade (TSE). Alguns comercializadores separam na fatura, outros não. Verifique se há alguma referência a Financiamento Tarifa Social na fatura em (€/kWh)")
+        checkbox_tse_incluido_estado = st.checkbox("Inclui Financiamento TSE?", value=st.session_state.get(key_meu_fin_tse_incluido, True), key=key_meu_fin_tse_incluido, help="É importante saber se os valores têm ou não incluido o financiamento da Tarifa Social de Eletricidade (TSE). Alguns comercializadores separam na fatura, outros não. Verifique se há alguma referência a Financiamento Tarifa Social na fatura em (€/kWh)", on_change=atualizar_url_meu_tarifario)
         adicionar_financiamento_tse_meu = not checkbox_tse_incluido_estado
 
 
     col_userd1, col_userd2, col_userd3, col_userd4 = st.columns(4)
     with col_userd1:
         desconto_energia = st.number_input("Desconto Energia (%)", min_value=0.0, max_value=100.0, step=0.1,
-                                           value=st.session_state.get(key_meu_desconto_energia, 0.0), key=key_meu_desconto_energia, help="O desconto é aplicado a Energia+TAR. Alguns tarifários não aplicam o desconto nas TAR (por exemplo os da Plenitude), pelo que o desconto não pode ser aqui aplicado. Se não tiver, não necessita preencher!")
+                                           value=st.session_state.get(key_meu_desconto_energia, 0.0), key=key_meu_desconto_energia, help="O desconto é aplicado a Energia+TAR. Alguns tarifários não aplicam o desconto nas TAR (por exemplo os da Plenitude), pelo que o desconto não pode ser aqui aplicado. Se não tiver, não necessita preencher!", on_change=atualizar_url_meu_tarifario)
     with col_userd2:
         desconto_potencia = st.number_input("Desconto Potência (%)", min_value=0.0, max_value=100.0, step=0.1,
-                                            value=st.session_state.get(key_meu_desconto_potencia, 0.0), key=key_meu_desconto_potencia, help="O desconto é aplicado a Potência+TAR. Alguns tarifários não aplicam o desconto nas TAR, pelo que se assim for, o desconto não pode ser aqui aplicado. Se não tiver, não necessita preencher!")
+                                            value=st.session_state.get(key_meu_desconto_potencia, 0.0), key=key_meu_desconto_potencia, help="O desconto é aplicado a Potência+TAR. Alguns tarifários não aplicam o desconto nas TAR, pelo que se assim for, o desconto não pode ser aqui aplicado. Se não tiver, não necessita preencher!", on_change=atualizar_url_meu_tarifario)
     with col_userd3:
         desconto_fatura_input_meu = st.number_input("Desconto Fatura (€)", min_value=0.0, step=0.01, format="%.2f",
-                                                 value=st.session_state.get(key_meu_desconto_fatura, 0.0), key=key_meu_desconto_fatura, help="Se não tiver, não necessita preencher!")
+                                                 value=st.session_state.get(key_meu_desconto_fatura, 0.0), key=key_meu_desconto_fatura, help="Se não tiver, não necessita preencher!", on_change=atualizar_url_meu_tarifario)
     with col_userd4:
         acrescimo_fatura_input_meu = st.number_input("Acréscimo Fatura (€)", min_value=0.0, step=0.01, format="%.2f",
-                                                 value=st.session_state.get(key_meu_acrescimo_fatura, 0.0), key=key_meu_acrescimo_fatura, help="Para outros custos fixos na fatura. Se não tiver, não necessita preencher!")
+                                                 value=st.session_state.get(key_meu_acrescimo_fatura, 0.0), key=key_meu_acrescimo_fatura, help="Para outros custos fixos na fatura. Se não tiver, não necessita preencher!", on_change=atualizar_url_meu_tarifario)
     
     if st.button("Calcular e Adicionar O Meu Tarifário à Comparação", icon="🧮", type="primary", key="btn_meu_tarifario", use_container_width=True):
 
@@ -5325,9 +5511,9 @@ except Exception as e_poupanca: # Renomeado para e_poupanca_ui para evitar confl
 # --- FIM DO BLOCO PARA EXIBIR POUPANÇA ---
 
 #ATENÇÃO, PODE CAUSAR PROBLEMAS
-st.empty()
-import time
-time.sleep(0.2) # Geralmente uma má ideia em apps Streamlit
+#st.empty()
+#import time
+#time.sleep(0.2) # Geralmente uma má ideia em apps Streamlit
 
 if not df_resultados.empty:
     colunas_visiveis_presentes = []
@@ -7375,75 +7561,84 @@ if is_diagram_mode:
 
 # --- FIM DA SECÇÃO ---
 # ##################################################################
-st.subheader("🔗 Partilhar Simulação")
 
-if st.query_params:
-    base_url = "https://tiagofelicia.streamlit.app/"
-    params_filtrados = {k: v for k, v in st.query_params.items() if v and v != '0'}
+# Esta secção inteira só será apresentada se NÃO estivermos em modo de diagrama.
+if not is_diagram_mode:
+    st.subheader("🔗 Partilhar Simulação")
 
-    if params_filtrados:
-        query_string = "&".join([f"{k}={v}" for k, v in params_filtrados.items()])
-        shareable_link = f"{base_url}?{query_string}"
+    if st.query_params:
+        base_url = "https://tiagofelicia.streamlit.app/"
+        # Filtra parâmetros, mantendo "0" apenas para ACP e Continente
+        params_filtrados = {}
+        for k, v in st.query_params.items():
+            if v:  # ignora None ou vazio
+                if v == "0" and k not in ("acp", "cont"):
+                    continue  # continua a filtrar zeros de outros parâmetros
+                params_filtrados[k] = v
 
-        # --- Componente HTML/JS para o campo de texto e botão de copiar ---
-        html_componente_copiar = f"""
-        <div style="display: flex; align-items: center; gap: 8px; font-family: sans-serif;">
-            <input 
-                type="text" 
-                id="shareable-link-input" 
-                value="{shareable_link}" 
-                readonly 
-                style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;"
-            >
-            <button 
-                id="copy-button" 
-                onclick="copyLinkToClipboard()"
-                style="
-                    padding: 8px 12px; 
-                    border-radius: 6px; 
-                    border: 1px solid #ccc;
-                    background-color: #f0f2f6; 
-                    cursor: pointer;
-                    font-size: 14px;
-                    white-space: nowrap;
-                "
-            >
-                📋 Copiar Link
-            </button>
-        </div>
+        if params_filtrados:
+            query_string = "&".join([f"{k}={v}" for k, v in params_filtrados.items()])
+            shareable_link = f"{base_url}?{query_string}"
 
-        <script>
-        function copyLinkToClipboard() {{
-            // 1. Obter o elemento do input
-            const linkInput = document.getElementById("shareable-link-input");
-            
-            // 2. Selecionar o texto
-            linkInput.select();
-            linkInput.setSelectionRange(0, 99999); // Necessário para telemóveis
+            # --- Componente HTML/JS para o campo de texto e botão de copiar ---
+            html_componente_copiar = f"""
+            <div style="display: flex; align-items: center; gap: 8px; font-family: sans-serif;">
+                <input 
+                    type="text" 
+                    id="shareable-link-input" 
+                    value="{shareable_link}" 
+                    readonly 
+                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px;"
+                >
+                <button 
+                    id="copy-button" 
+                    onclick="copyLinkToClipboard()"
+                    style="
+                        padding: 8px 12px; 
+                        border-radius: 6px; 
+                        border: 1px solid #ccc;
+                        background-color: #f0f2f6; 
+                        cursor: pointer;
+                        font-size: 14px;
+                        white-space: nowrap;
+                    "
+                >
+                    📋 Copiar Link
+                </button>
+            </div>
 
-            // 3. Copiar para a área de transferência
-            navigator.clipboard.writeText(linkInput.value).then(() => {{
-                // 4. Dar feedback ao utilizador
-                const copyButton = document.getElementById("copy-button");
-                copyButton.innerText = "Copiado!";
-                // Voltar ao texto original após 2 segundos
-                setTimeout(() => {{
-                    copyButton.innerHTML = "&#128203; Copiar Link"; // &#128203; é o emoji da prancheta
-                }}, 2000);
-            }}).catch(err => {{
-                console.error('Falha ao copiar o link: ', err);
-                const copyButton = document.getElementById("copy-button");
-                copyButton.innerText = "Erro!";
-            }});
-        }}
-        </script>
-        """
-        st.components.v1.html(html_componente_copiar, height=55)
+            <script>
+            function copyLinkToClipboard() {{
+                // 1. Obter o elemento do input
+                const linkInput = document.getElementById("shareable-link-input");
+                
+                // 2. Selecionar o texto
+                linkInput.select();
+                linkInput.setSelectionRange(0, 99999); // Necessário para telemóveis
 
+                // 3. Copiar para a área de transferência
+                navigator.clipboard.writeText(linkInput.value).then(() => {{
+                    // 4. Dar feedback ao utilizador
+                    const copyButton = document.getElementById("copy-button");
+                    copyButton.innerText = "Copiado!";
+                    // Voltar ao texto original após 2 segundos
+                    setTimeout(() => {{
+                        copyButton.innerHTML = "&#128203; Copiar Link"; // &#128203; é o emoji da prancheta
+                    }}, 2000);
+                }}).catch(err => {{
+                    console.error('Falha ao copiar o link: ', err);
+                    const copyButton = document.getElementById("copy-button");
+                    copyButton.innerText = "Erro!";
+                }});
+            }}
+            </script>
+            """
+            st.components.v1.html(html_componente_copiar, height=55)
+
+        else:
+            st.info("Altere um dos parâmetros para gerar um link de partilha.")
     else:
-        st.info("Altere um dos parâmetros para gerar um link de partilha.")
-else:
-    st.info("Altere um dos parâmetros (Potência, Opção ou Consumos) para gerar um link de partilha.")
+        st.info("Altere um dos parâmetros (Potência, Opção ou Consumos) para gerar um link de partilha.")
 
 # ##################################################################
 # FIM DO BLOCO
