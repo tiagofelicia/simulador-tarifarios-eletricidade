@@ -19,10 +19,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configurar R e instalar pacotes
-        # CORREÇÃO: Especificar a versão exata para garantir que tem a funcionalidade 'r-packages'
         uses: r-lib/actions/setup-r@v2.4.0
         with:
           r-version: '4.4.1'
+          # A CORREÇÃO ESTÁ AQUI: Adicionar o '|' para o bloco de texto de várias linhas
           r-packages: |
             dplyr
             stringr
