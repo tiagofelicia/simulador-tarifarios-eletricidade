@@ -361,5 +361,3 @@ tryCatch({
 }, error = function(e) {
   stop("ERRO: Falha ao escrever no ficheiro Excel. Detalhes: ", e$message)
 })
-
-cat(paste0("🏁 Atualização concluída em ", round(difftime(Sys.time(), start_time, units = "mins"), 1), " minutos.\n"))
