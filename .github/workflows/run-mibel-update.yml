@@ -42,7 +42,7 @@ jobs:
       - name: Instalar pacotes R
         # Este passo agora só instala pacotes se não existirem no cache
         run: |
-          install.packages(c('dplyr', 'stringr', 'lubridate', 'httr', 'rvest', 'tidyr', 'purrr', 'readxl', 'openxlsx', 'readr'))
+          install.packages(c('dplyr', 'stringr', 'lubridate', 'httr', 'tidyr', 'purrr', 'readxl', 'openxlsx', 'readr'))
         shell: Rscript {0}
 
       - name: Executar script de atualização com logging
