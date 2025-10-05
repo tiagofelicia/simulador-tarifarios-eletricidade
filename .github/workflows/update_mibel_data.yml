@@ -1,0 +1,75 @@
+name: Atualização OMIE e OMIP (Tarifários Eletricidade)
+
+on:
+  schedule:
+    # Segunda a Sexta: 12:05 e 18:55 de Lisboa (11:05 e 17:55 UTC)
+    - cron: '5 11 * * 1-5'
+    - cron: '55 17 * * 1-5'
+    # Sábado e Domingo: 12:05 de Lisboa (11:05 UTC)
+    - cron: '5 11 * * 6,0'
+  workflow_dispatch:  # Permite execução manual no GitHub
+
+jobs:
+  atualizar_mibel:
+    name: Atualizar MIBEL
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar R e instalar pacotes
+        # Este é o bloco de instalação que foi validado pelo teste
+        uses: r-lib/actions/setup-r@v2.4.0
+        with:
+          r-version: '4.4.1'
+          r-packages: |
+            dplyr
+            stringr
+            lubridate
+            httr
+            rvest
+            tidyr
+            purrr
+            readxl
+            openxlsx
+            readr
+
+      - name: Executar script de atualização com logging
+        run: |
+          mkdir -p logs
+          start_time=$(date +%s)
+          echo "=== Execução iniciada em $(date -d @$start_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
+          
+          Rscript scripts/atualizacao_eletricidade_MIBEL.r >> logs/atualizacao_eletricidade_MIBEL.log 2>&1
+          
+          end_time=$(date +%s)
+          echo "=== Execução terminada em $(date -d @$end_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
+          runtime=$((end_time-start_time))
+          echo "Duração total: ${runtime} segundos." >> logs/atualizacao_eletricidade_MIBEL.log
+          echo "" >> logs/atualizacao_eletricidade_MIBEL.log
+
+      - name: Fazer upload do log como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log_atualizacao_eletricidade_MIBEL
+          path: logs/atualizacao_eletricidade_MIBEL.log
+
+      - name: Verificar se houve alterações
+        id: git-check
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit e push se houver alterações
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "📊 Dados MIBEL atualizados automaticamente"
+          git push
