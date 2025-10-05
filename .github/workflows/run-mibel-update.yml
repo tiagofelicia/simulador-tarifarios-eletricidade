@@ -12,6 +12,7 @@ jobs:
     name: Executar Atualização MIBEL
     runs-on: ubuntu-latest
 
+    # Adicionar este bloco para dar permissão ao workflow para fazer 'push'
     permissions:
       contents: write
 
@@ -20,27 +21,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configurar R
-        # Adicionamos um 'id' para que o passo de cache possa referenciar a versão do R
-        id: setup-r
-        uses: r-lib/actions/setup-r@v2.4.0
+        uses: r--lib/actions/setup-r@v2.4.0
         with:
           r-version: '4.4.1'
 
-      # =================================================================
-      # PASSO NOVO: Guardar e restaurar os pacotes R instalados
-      # =================================================================
-      - name: Cache dos pacotes R
-        uses: actions/cache@v4
-        with:
-          # O caminho para a pasta onde os pacotes R são instalados
-          path: ${{ env.R_LIBS_USER }}
-          # Uma chave única para identificar o cache. Se o script R mudar, o cache é invalidado.
-          key: ${{ runner.os }}-r-${{ steps.setup-r.outputs.r-version }}-${{ hashFiles('scripts/atualizacao_eletricidade_MIBEL.r') }}
-          restore-keys: |
-            ${{ runner.os }}-r-${{ steps.setup-r.outputs.r-version }}-
+      - name: Instalar dependências de sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
 
       - name: Instalar pacotes R
-        # Este passo agora só instala pacotes se não existirem no cache
         run: |
           install.packages(c('dplyr', 'stringr', 'lubridate', 'httr', 'rvest', 'tidyr', 'purrr', 'readxl', 'openxlsx', 'readr'))
         shell: Rscript {0}
