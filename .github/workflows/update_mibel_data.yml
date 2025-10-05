@@ -22,7 +22,7 @@ jobs:
         uses: r-lib/actions/setup-r@v2.4.0
         with:
           r-version: '4.4.1'
-          # A CORREÇÃO ESTÁ AQUI: Adicionar o '|' para o bloco de texto de várias linhas
+          # A correção está no '|' abaixo, que define um bloco de texto de várias linhas.
           r-packages: |
             dplyr
             stringr
