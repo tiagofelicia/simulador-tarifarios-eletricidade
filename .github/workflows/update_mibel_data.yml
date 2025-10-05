@@ -18,24 +18,44 @@ jobs:
       - name: Checkout do repositório
         uses: actions/checkout@v4
 
-      - name: Configurar R
+      # ================== ALTERAÇÃO PRINCIPAL AQUI ==================
+      # Combinamos a configuração do R e a instalação de pacotes num único passo,
+      # que é mais robusto e usa cache.
+      - name: Configurar R e instalar pacotes
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.4.1'
-
-      - name: Instalar pacotes R necessários
-        run: |
-          Rscript -e "options(repos = c(CRAN = 'https://cloud.r-project.org')); \
-          pacotes <- c('dplyr','stringr','lubridate','httr','rvest','tidyr','purrr','readxl','openxlsx','readr'); \
-          novos <- pacotes[!(pacotes %in% installed.packages()[,'Package'])]; \
-          if(length(novos)>0) install.packages(novos)"
+          r-packages: |
+            dplyr
+            stringr
+            lubridate
+            httr
+            rvest
+            tidyr
+            purrr
+            readxl
+            openxlsx
+            readr
+      # ==============================================================
 
       - name: Executar script de atualização com logging
         run: |
           mkdir -p logs
-          echo "=== Execução iniciada em $(date '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
+          # Adicionamos uma verificação do tempo de início aqui
+          start_time=$(date +%s)
+          echo "=== Execução iniciada em $(date -d @$start_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
+          
+          # Garantir que o script tem permissão de execução (boa prática)
+          chmod +x scripts/atualizacao_eletricidade_MIBEL.r
+          
+          # Corrigido o caminho para o script, assumindo que ele está na pasta 'scripts'
           Rscript scripts/atualizacao_eletricidade_MIBEL.r >> logs/atualizacao_eletricidade_MIBEL.log 2>&1
-          echo "=== Execução terminada em $(date '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
+          
+          end_time=$(date +%s)
+          echo "=== Execução terminada em $(date -d @$end_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
+          # Adicionamos o cálculo da duração ao log
+          runtime=$((end_time-start_time))
+          echo "Duração total: ${runtime} segundos." >> logs/atualizacao_eletricidade_MIBEL.log
           echo "" >> logs/atualizacao_eletricidade_MIBEL.log
 
       - name: Fazer upload do log como artefacto
