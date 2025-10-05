@@ -23,18 +23,28 @@ jobs:
         with:
           r-version: '4.4.1'
 
+      - name: Cache dos pacotes R
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/R
+          key: ${{ runner.os }}-R-${{ hashFiles('**/*.r', '**/*.R') }}
+          restore-keys: ${{ runner.os }}-R-
+
       - name: Instalar pacotes R necessários
         run: |
-          Rscript -e 'install.packages(c(
-            "dplyr", "stringr", "lubridate", "httr", "rvest",
-            "tidyr", "purrr", "readxl", "openxlsx", "readr"
-          ), repos="https://cloud.r-project.org")'
+          Rscript -e 'options(repos = c(CRAN = "https://cloud.r-project.org")); \
+          pacotes <- c("dplyr","stringr","lubridate","httr","rvest","tidyr","purrr","readxl","openxlsx","readr"); \
+          novos <- pacotes[!(pacotes %in% installed.packages()[,"Package"])]; \
+          if(length(novos)>0) install.packages(novos)'
+
+      - name: Verificar estrutura do repositório (debug)
+        run: ls -R
 
       - name: Executar script de atualização com logging
         run: |
           mkdir -p logs
           echo "=== Execução iniciada em $(date '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
-          Rscript scripts/atualizacao_eletricidade_MIBEL.r >> logs/atualizacao_eletricidade_MIBEL.log 2>&1
+          Rscript scripts/atualizacao_eletricidade_MIBEL.r >> logs/atualizacao_eletricidade_MIBEL.log 2>&1 || true
           echo "=== Execução terminada em $(date '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
           echo "" >> logs/atualizacao_eletricidade_MIBEL.log
 
