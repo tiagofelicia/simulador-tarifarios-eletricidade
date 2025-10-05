@@ -53,5 +53,5 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "🔄 Atualização automática OMIE/OMIP ($(date +'%Y-%m-%d %H:%M'))"
+          git commit -m "📊 Dados MIBEL atualizados automaticamente"
           git push
