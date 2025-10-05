@@ -18,9 +18,9 @@ jobs:
       - name: Checkout do repositório
         uses: actions/checkout@v4
 
-      # Este é o passo crucial. Ele configura o R e instala TODOS os pacotes listados.
       - name: Configurar R e instalar pacotes
-        uses: r-lib/actions/setup-r@v2
+        # CORREÇÃO: Especificar a versão exata para garantir que tem a funcionalidade 'r-packages'
+        uses: r-lib/actions/setup-r@v2.4.0
         with:
           r-version: '4.4.1'
           r-packages: |
@@ -41,7 +41,6 @@ jobs:
           start_time=$(date +%s)
           echo "=== Execução iniciada em $(date -d @$start_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_eletricidade_MIBEL.log
           
-          # Assumindo que o seu script está numa pasta chamada 'scripts'
           Rscript scripts/atualizacao_eletricidade_MIBEL.r >> logs/atualizacao_eletricidade_MIBEL.log 2>&1
           
           end_time=$(date +%s)
