@@ -2,28 +2,75 @@ import streamlit as st
 import pandas as pd
 import datetime
 from calendar import monthrange
+import requests
+import io
 
 # --- Carregar ficheiro Excel do GitHub ---
+# --- Para simulador de gás
 @st.cache_data(ttl=1800, show_spinner=False) # Cache por 30 minutos (1800 segundos)
-def carregar_dados_excel(url):
+def carregar_dados_excel_gas(url):
     xls = pd.ExcelFile(url)
+    try:
+        tarifas_gas_master = xls.parse("Tarifas_Gas_Master")
+    except Exception as e:
+        # Se a aba não existir, criamos um DataFrame vazio para não quebrar a app
+        st.error(f"Atenção: A aba 'Tarifas_Gas_Master' não foi encontrada no Excel. {e}")
+        tarifas_gas_master = pd.DataFrame()
+    try:
+        tos_municipios = xls.parse("TOS")
+        # --- Limpar nomes das colunas da aba TOS ---
+        if not tos_municipios.empty:
+             tos_municipios.columns = [str(c).strip() for c in tos_municipios.columns]
+    except Exception:
+        st.error("Aviso: A aba 'TOS' (Taxa Ocupação Subsolo) não foi encontrada no Excel.")
+        tos_municipios = pd.DataFrame()
+    try:
+        mibgas_df = xls.parse("MIBGAS")
+    except Exception:
+        st.warning("Aviso: A aba 'MIBGAS' não foi encontrada no Excel.")
+        mibgas_df = pd.DataFrame()
+    try:
+        info_tab = xls.parse("Info")
+    except Exception:
+        st.warning("Aviso: A aba 'Info' não foi encontrada no Excel.")
+        info_tab = pd.DataFrame()
+
+    constantes = xls.parse("Constantes")
+    return constantes, tarifas_gas_master, tos_municipios, mibgas_df, info_tab
+
+# --- Carregar ficheiro Excel do GitHub ---
+# --- Para simulador de eletricidade
+@st.cache_data(ttl=1800, show_spinner=False)
+def carregar_dados_excel_elec(url):
+    """
+    Carrega os dados do ficheiro Excel de eletricidade a partir de um URL.
+    Usa 'requests' para descarregar e o motor 'calamine' para ler de forma robusta.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        excel_file_in_memory = io.BytesIO(response.content)
+        xls = pd.ExcelFile(excel_file_in_memory, engine='calamine')
+        
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao descarregar o ficheiro Excel do GitHub: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+
     tarifarios_fixos = xls.parse("Tarifarios_fixos")
     tarifarios_indexados = xls.parse("Indexados")
     omie_perdas_ciclos = xls.parse("OMIE_PERDAS_CICLOS")
-    # Limpar nomes das colunas em OMIE_PERDAS_CICLOS
+
     omie_perdas_ciclos.columns = [str(c).strip() for c in omie_perdas_ciclos.columns]
     
-    # GARANTIR QUE TEMOS COLUNAS DE DATA E HORA SEPARADAS
     if 'Data' not in omie_perdas_ciclos.columns and 'DataHora' in omie_perdas_ciclos.columns:
         temp_dt = pd.to_datetime(omie_perdas_ciclos['DataHora'])
         omie_perdas_ciclos['Data'] = temp_dt.dt.strftime('%m/%d/%Y')
         omie_perdas_ciclos['Hora'] = temp_dt.dt.strftime('%H:%M')
 
     if 'Data' in omie_perdas_ciclos.columns and 'Hora' in omie_perdas_ciclos.columns:
-        # CORREÇÃO: Forçar a leitura com o formato exato MM/DD/YYYY HH:MM
         omie_perdas_ciclos['DataHora'] = pd.to_datetime(
             omie_perdas_ciclos['Data'].astype(str) + ' ' + omie_perdas_ciclos['Hora'].astype(str),
-            format='%m/%d/%Y %H:%M',  # Formato Americano
+            format='%m/%d/%Y %H:%M',
             errors='coerce'
         ).dt.tz_localize(None)
         
@@ -34,6 +81,8 @@ def carregar_dados_excel(url):
 
     constantes = xls.parse("Constantes")
     return tarifarios_fixos, tarifarios_indexados, omie_perdas_ciclos, constantes
+
+
 
 def processar_ficheiro_consumos(ficheiro_excel):
     """
@@ -209,3 +258,29 @@ def calcular_medias_omie_para_todos_ciclos(df_consumos_periodo, df_omie_completo
             for periodo, media in agrupado.items():
                 omie_medios[f"{ciclo}_{periodo}"] = media
     return omie_medios
+
+def normalizar_para_ordenacao(texto):
+    """
+    Remove acentos de um texto e converte para minúsculas para criar uma
+    chave de ordenação alfabética que funciona de forma consistente.
+    Ex: 'Évora' -> 'evora'
+    """
+    if not isinstance(texto, str):
+        return texto
+
+    # Dicionário de substituição de caracteres
+    substituicoes = {
+        'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a',
+        'é': 'e', 'ê': 'e',
+        'í': 'i',
+        'ó': 'o', 'ô': 'o', 'õ': 'o',
+        'ú': 'u', 'ü': 'u',
+        'ç': 'c',
+    }
+    
+    texto_lower = texto.lower()
+    texto_normalizado = ""
+    for char in texto_lower:
+        texto_normalizado += substituicoes.get(char, char)
+        
+    return texto_normalizado

@@ -445,3 +445,60 @@ def preparar_dados_mensais(df_consumos, st_session_state):
         'categorias': categorias_eixo_x,
         'series': series_grafico
     }
+
+def preparar_dados_grafico_mibgas(df_mibgas, data_inicio, data_fim, data_split_spot_futuros):
+    """
+    Prepara os dados para um gráfico de evolução diária do MIBGAS,
+    separando os dados em Spot (reais) e Futuros (estimativas).
+    """
+    if df_mibgas.empty or 'Data' not in df_mibgas.columns or 'Preço' not in df_mibgas.columns:
+        return None
+
+    # Garantir que as colunas têm o tipo de dados correto
+    df_mibgas['Data'] = pd.to_datetime(df_mibgas['Data'], errors='coerce').dt.date
+    df_mibgas['Preço'] = pd.to_numeric(df_mibgas['Preço'], errors='coerce')
+    df_mibgas.dropna(subset=['Data', 'Preço'], inplace=True)
+
+    # 1. Filtrar os dados para o período selecionado pelo utilizador
+    df_periodo = df_mibgas[
+        (df_mibgas['Data'] >= data_inicio) &
+        (df_mibgas['Data'] <= data_fim)
+    ].sort_values(by='Data').copy()
+
+    if df_periodo.empty:
+        return None
+
+    # 2. Preparar as séries para o gráfico (Spot vs. Futuros)
+    dados_spot = []
+    dados_futuros = []
+
+    for _, row in df_periodo.iterrows():
+        valor_arredondado = round(row['Preço'], 2)
+        
+        # Se a data da linha for anterior ou igual à data de split, é um preço Spot
+        if row['Data'] <= data_split_spot_futuros:
+            dados_spot.append(valor_arredondado)
+            dados_futuros.append(None) # Adiciona um ponto nulo na outra série
+        else:
+            dados_spot.append(None) # Adiciona um ponto nulo na série Spot
+            dados_futuros.append(valor_arredondado)
+
+    # 3. Construir a estrutura de dados final para o Highcharts
+    return {
+        'id': 'grafico_evolucao_mibgas',
+        'titulo': 'Evolução Diária do Preço MIBGAS (Spot vs. Futuros)',
+        'categorias': pd.to_datetime(df_periodo['Data']).dt.strftime('%d/%m').tolist(),
+        'series': [
+            {
+                "name": "MIBGAS Spot (real)", 
+                "data": dados_spot, 
+                "color": "#00B050" # Verde
+            },
+            {
+                "name": "MIBGAS Futuros (estimado)", 
+                "data": dados_futuros, 
+                "color": "#FFC000", # Amarelo/Laranja
+                "dashStyle": "shortdot"
+            }
+        ]
+    }

@@ -2107,3 +2107,631 @@ def calcular_detalhes_custo_meu_tarifario(
         return None
 
 
+
+# PARA GÁS NATURAL
+# --- Função: Obter TAR Gás Fixo por Escalão ---
+def obter_tar_gas_fixo(escalao_num, constantes_df):
+    """Obtém a TAR fixa diária para um determinado escalão de gás."""
+    nome_constante = f'TAR_Gas_Fixo_E{escalao_num}'
+    return obter_constante(nome_constante, constantes_df)
+
+# --- Função: Obter TAR Gás Energia por Escalão ---
+def obter_tar_gas_energia(escalao_num, constantes_df):
+    """Obtém a TAR de energia (€/kWh) para um determinado escalão de gás."""
+    nome_constante = f'TAR_Gas_Energia_E{escalao_num}'
+    return obter_constante(nome_constante, constantes_df)
+
+# --- Função: Obter Desconto TS Gás Fixo por Escalão ---
+def obter_desconto_ts_gas_fixo(escalao_num, constantes_df):
+    """Obtém o desconto da Tarifa Social sobre o termo fixo de gás."""
+    nome_constante = f'Desconto_TS_Gas_Fixo_E{escalao_num}'
+    return obter_constante(nome_constante, constantes_df)
+
+# --- Função: Obter Desconto TS Gás Energia por Escalão ---
+def obter_desconto_ts_gas_energia(escalao_num, constantes_df):
+    """Obtém o desconto da Tarifa Social sobre o termo de energia de gás."""
+    nome_constante = f'Desconto_TS_Gas_Energia_E{escalao_num}'
+    return obter_constante(nome_constante, constantes_df)
+
+# --- Função Principal: Calcular Custo Total do Gás ---
+def calcular_custo_gas_completo(
+    dados_tarifa_gas_linha, 
+    consumo_kwh_periodo,    
+    dias_periodo,           
+    escalao_num,
+    tarifa_social_ativa,
+    constantes_df,
+    tos_fixo_dia_val,        
+    tos_variavel_kwh_val,   
+    mibgas_price_mwh_input,
+    isp_gas_valor_manual,
+    # --- Argumentos da V14 ---
+    acp_gas_flag,
+    desconto_continente_gas_flag,
+    VALOR_QUOTA_ACP_MENSAL_CONST
+):
+    """
+    (V15) Adiciona as fórmulas de cálculo detalhadas para tarifários indexados de Gás,
+    replicando a arquitetura do simulador de eletricidade (Opção 1).
+    """
+    try:
+        IVA_NORMAL_PERC = 0.23
+        IVA_REDUZIDO_PERC = 0.06
+        
+        tipo_tarifa = dados_tarifa_gas_linha.get('tipo', 'Fixo') 
+        nome_original_tarifario = dados_tarifa_gas_linha['Nome_Tarifa_G']
+        nome_a_exibir_final = nome_original_tarifario 
+
+        # --- 1. Calcular Preço Base de Energia (Comercializador) ---
+        
+        # Obter o MIBGAS em €/kWh
+        mibgas_kwh = mibgas_price_mwh_input / 1000.0
+        # Obter Fator de Perdas (constante global de gás, ex: 0.04)
+        perdas_dec = obter_constante("PERDAS_GAS_GBL", constantes_df)
+        perdas_coef = 1.0 + perdas_dec # (ex: 1.04)
+
+        preco_energia_comerc_input = 0.0 # Inicializar
+
+        if tipo_tarifa == 'Fixo':
+            preco_energia_comerc_input = float(dados_tarifa_gas_linha.get('Termo_Energia_eur_kwh', 0.0))
+        
+        elif tipo_tarifa == 'Indexado':
+            # --- INÍCIO DA LÓGICA DE FÓRMULAS INDEXADAS (REQ. V19) ---
+            
+            if nome_original_tarifario == "Luzigás - Plano Gás":
+                # Fórmula: (MIBGAS + K + CGS) (TAR False)
+                k = obter_constante("Luzigas_Gas_K", constantes_df)
+                cgs = obter_constante("Luzigas_Gas_CGS", constantes_df)
+                preco_energia_comerc_input = mibgas_kwh + k + cgs
+            
+            elif nome_original_tarifario == "EDP - Gás Indexado":
+                # Fórmula: (MIBGAS * (1+Perdas) * K1 + K2) (TAR False)
+                EDP_Perdas = obter_constante("EDP_Gas_(1+Perdas)", constantes_df)
+                k1 = obter_constante("EDP_Gas_K1", constantes_df)
+                k2 = obter_constante("EDP_Gas_K2", constantes_df)
+                preco_energia_comerc_input = (mibgas_kwh * EDP_Perdas * k1) + k2
+
+            elif nome_original_tarifario == "Galp Plano Flexível - Gás":
+                 # Fórmula: (MIBGAS + C) * (1+L) (TAR False)
+                c = obter_constante("Galp_Gas_C", constantes_df)
+                Galp_Perdas = obter_constante("Galp_Gas_(1+L)", constantes_df)
+                preco_energia_comerc_input = (mibgas_kwh + c) * Galp_Perdas
+
+            elif nome_original_tarifario == "Endesa Gás Tarifa Indexada":
+                # Fórmula: (MIBGAS + A[escalão]) (TAR True)
+                # Esta fórmula depende do escalão.
+                a_val = obter_constante(f"Endesa_Gas_A{escalao_num}", constantes_df)
+                preco_energia_comerc_input = mibgas_kwh + a_val
+                # Nota: A flag tar_incluida_energia=True será lida abaixo e tratará isto corretamente.
+
+            elif nome_original_tarifario == "Goldenergy Tarifa Index Gas 100% Online":
+                # Fórmula: (Pmibgas * (1 + Perdas) + QTarifa + CG) (TAR False)
+                GE_Perdas = obter_constante("GE_Gas_(1+Perdas)", constantes_df)
+                qtarifa = obter_constante("GE_Gas_QTarifa", constantes_df)
+                cg = obter_constante("GE_Gas_CG", constantes_df)
+                preco_energia_comerc_input = mibgas_kwh * GE_Perdas + qtarifa + cg
+
+            else:
+                # Fallback para tarifários indexados genéricos (se existirem)
+                margem_generica = float(dados_tarifa_gas_linha.get('Margem_Index', 0.0))
+                preco_energia_comerc_input = mibgas_kwh + margem_generica
+                if margem_generica == 0.0:
+                    st.warning(f"Aviso: Tarifário indexado '{nome_original_tarifario}' não tem fórmula dedicada nem Margem_Index no Excel. Custo de energia pode ser zero.")
+            
+            # --- FIM DA LÓGICA DE FÓRMULAS ---
+
+        # --- 2. Obter Preço Fixo e Flags ---
+        preco_fixo_comerc_input = float(dados_tarifa_gas_linha.get('Termo_Fixo_eur_dia', 0.0))
+        tar_fixo_incluida_flag = dados_tarifa_gas_linha.get('tar_incluida_termo_fixo', True)
+        tar_energia_incluida_flag = dados_tarifa_gas_linha.get(
+            'tar_incluida_energia', 
+            False if tipo_tarifa == 'Indexado' else True
+        )
+
+        # 3. Obter TARs Reguladas (Base)
+        tar_fixo_regulada_base = obter_tar_gas_fixo(escalao_num, constantes_df)
+        tar_energia_regulada_base = obter_tar_gas_energia(escalao_num, constantes_df)
+        
+        # 4. Obter ISP (do input manual)
+        isp_gas_kwh = isp_gas_valor_manual 
+
+        # 5. Determinar componentes do Comercializador (separar TARs)
+        comp_fixo_comercializador_dia = (preco_fixo_comerc_input - tar_fixo_regulada_base) if tar_fixo_incluida_flag else preco_fixo_comerc_input
+        # Se a flag for True (ex: Endesa), subtrai a TAR. Se for False (outros indexados), o preço é apenas a componente comercial.
+        comp_energia_comercializador_kwh = (preco_energia_comerc_input - tar_energia_regulada_base) if tar_energia_incluida_flag else preco_energia_comerc_input
+
+
+        # 6. Aplicar Tarifa Social (TS) - Desconto aplica-se às TARs
+        tar_fixo_final_a_pagar = tar_fixo_regulada_base
+        tar_energia_final_a_pagar = tar_energia_regulada_base
+        isp_total_s_iva_periodo = consumo_kwh_periodo * isp_gas_kwh 
+        
+        desconto_ts_fixo_valor_aplicado = 0.0
+        desconto_ts_energia_valor_aplicado = 0.0
+
+        if tarifa_social_ativa and escalao_num in [1, 2]: 
+            desconto_ts_fixo_bruto = obter_desconto_ts_gas_fixo(escalao_num, constantes_df)
+            desconto_ts_energia_bruto = obter_desconto_ts_gas_energia(escalao_num, constantes_df)
+            
+            tar_fixo_final_a_pagar = max(0.0, tar_fixo_regulada_base - desconto_ts_fixo_bruto)
+            tar_energia_final_a_pagar = max(0.0, tar_energia_regulada_base - desconto_ts_energia_bruto)
+            
+            desconto_ts_fixo_valor_aplicado = tar_fixo_regulada_base - tar_fixo_final_a_pagar
+            desconto_ts_energia_valor_aplicado = tar_energia_regulada_base - tar_energia_final_a_pagar
+            
+            isp_total_s_iva_periodo = 0.0
+            
+        # 7. Preços Unitários Finais (Sem IVA) - Para exibir na tabela
+        preco_fixo_final_s_iva_dia = comp_fixo_comercializador_dia + tar_fixo_final_a_pagar
+        # Preço final da energia = Componente Comercial (da fórmula) + TAR Final (pós-TS)
+        preco_energia_final_s_iva_kwh = comp_energia_comercializador_kwh + tar_energia_final_a_pagar
+
+        # --- 8. LÓGICA DE CÁLCULO DE CUSTO (SEPARADA POR IVA) ---
+        custo_tar_fixo_periodo_s_iva = tar_fixo_final_a_pagar * dias_periodo
+        custo_comerc_fixo_periodo_s_iva = comp_fixo_comercializador_dia * dias_periodo
+        custo_tar_energia_periodo_s_iva = tar_energia_final_a_pagar * consumo_kwh_periodo
+        custo_comerc_energia_periodo_s_iva = comp_energia_comercializador_kwh * consumo_kwh_periodo
+        custo_tos_fixo_periodo_s_iva = tos_fixo_dia_val * dias_periodo
+        custo_tos_variavel_periodo_s_iva = tos_variavel_kwh_val * consumo_kwh_periodo
+
+        total_base_iva_reduzido = custo_tar_fixo_periodo_s_iva
+        total_base_iva_normal = (
+            custo_comerc_fixo_periodo_s_iva +
+            custo_tar_energia_periodo_s_iva +
+            custo_comerc_energia_periodo_s_iva +
+            isp_total_s_iva_periodo + 
+            custo_tos_fixo_periodo_s_iva +
+            custo_tos_variavel_periodo_s_iva 
+        )
+
+        iva_total_reduzido = total_base_iva_reduzido * IVA_REDUZIDO_PERC
+        iva_total_normal = total_base_iva_normal * IVA_NORMAL_PERC
+        iva_total_periodo = iva_total_reduzido + iva_total_normal
+
+        custo_subtotal_c_iva = total_base_iva_reduzido + total_base_iva_normal + iva_total_periodo
+
+        # --- 9. LÓGICA DE DESCONTOS FINAIS (V14) ---
+        
+        is_billing_month = 28 <= dias_periodo <= 31
+        desconto_total_final_eur = 0.0
+        acrescimo_total_final_eur = 0.0
+        
+        desconto_fatura_mensal_excel = float(dados_tarifa_gas_linha.get('desconto_fatura_mes', 0.0) or 0.0)
+        if desconto_fatura_mensal_excel > 0:
+            desconto_aplicado = desconto_fatura_mensal_excel if is_billing_month else (desconto_fatura_mensal_excel / 30.0) * dias_periodo
+            desconto_total_final_eur += desconto_aplicado
+            nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_excel:.2f}€/mês)" 
+        
+        if acp_gas_flag and nome_original_tarifario.startswith("Goldenergy - ACP"):
+            quota_aplicada = VALOR_QUOTA_ACP_MENSAL_CONST if is_billing_month else (VALOR_QUOTA_ACP_MENSAL_CONST / 30.0) * dias_periodo
+            acrescimo_total_final_eur += quota_aplicada
+            nome_a_exibir_final += f" (INCLUI Quota ACP)"
+        
+        if desconto_continente_gas_flag and nome_original_tarifario.startswith("Galp & Continente"):
+            # Base de custo ANTES da Tarifa Social
+            custo_energia_bruto_s_iva = (comp_energia_comercializador_kwh + tar_energia_regulada_base) * consumo_kwh_periodo
+            custo_fixo_bruto_s_iva = (comp_fixo_comercializador_dia + tar_fixo_regulada_base) * dias_periodo
+            
+            base_iva_reduzido_bruto = tar_fixo_regulada_base * dias_periodo
+            base_iva_normal_bruto_comerc = comp_fixo_comercializador_dia * dias_periodo
+            
+            # Custo Energia c/IVA (Bruto)
+            custo_energia_c_iva_bruto = (custo_energia_bruto_s_iva * (1 + IVA_NORMAL_PERC))
+            # Custo Fixo c/IVA (Bruto)
+            custo_fixo_c_iva_bruto = (base_iva_reduzido_bruto * (1 + IVA_REDUZIDO_PERC)) + (base_iva_normal_bruto_comerc * (1 + IVA_NORMAL_PERC))
+
+            base_desconto_continente_c_iva = custo_energia_c_iva_bruto + custo_fixo_c_iva_bruto
+            
+            desconto_continente_aplicado = 0.0
+            if nome_original_tarifario.startswith("Galp & Continente (-10% DD)"):
+                desconto_continente_aplicado = base_desconto_continente_c_iva * 0.10
+            elif nome_original_tarifario.startswith("Galp & Continente (-7% s/DD)"):
+                desconto_continente_aplicado = base_desconto_continente_c_iva * 0.07
+
+            desconto_total_final_eur += desconto_continente_aplicado
+            # Custo ANTES do desconto continente = Custo Subtotal (com TS) + Acréscimos (ACP) - Outros descontos (Fatura)
+            custo_antes_continente = custo_subtotal_c_iva - (desconto_total_final_eur - desconto_continente_aplicado) + acrescimo_total_final_eur
+            nome_a_exibir_final += f" (INCLUI desc. Cont. de {desconto_continente_aplicado:.2f}€, s/ desc. Cont.={custo_antes_continente:.2f}€)"
+            
+        custo_final_total_periodo_c_iva = custo_subtotal_c_iva - desconto_total_final_eur + acrescimo_total_final_eur
+
+        # --- 10. Construir Dicionários de Tooltip ---
+        componentes_tooltip_termo_fixo_dict = {
+            'tooltip_fixo_comerc_sem_tar': comp_fixo_comercializador_dia,
+            'tooltip_fixo_tar_bruta': tar_fixo_regulada_base,
+            'tooltip_fixo_ts_aplicada_flag': tarifa_social_ativa and escalao_num in [1, 2],
+            'tooltip_fixo_ts_desconto_valor': desconto_ts_fixo_valor_aplicado
+        }
+        componentes_tooltip_termo_energia_dict = {
+            'tooltip_energia_comerc_sem_tar': comp_energia_comercializador_kwh,
+            'tooltip_energia_tar_bruta': tar_energia_regulada_base,
+            'tooltip_energia_ts_aplicada_flag': tarifa_social_ativa and escalao_num in [1, 2],
+            'tooltip_energia_ts_desconto_valor': desconto_ts_energia_valor_aplicado
+        }
+        componentes_tooltip_custo_total_dict = {
+            'tt_cte_energia_siva': custo_tar_energia_periodo_s_iva + custo_comerc_energia_periodo_s_iva,
+            'tt_cte_fixo_siva': custo_tar_fixo_periodo_s_iva + custo_comerc_fixo_periodo_s_iva,
+            'tt_cte_isp_siva': isp_total_s_iva_periodo,
+            'tt_cte_tos_fixo_siva': custo_tos_fixo_periodo_s_iva,
+            'tt_cte_tos_var_siva': custo_tos_variavel_periodo_s_iva,
+            'tt_cte_total_siva': total_base_iva_reduzido + total_base_iva_normal,
+            'tt_cte_valor_iva_6_total': iva_total_reduzido,
+            'tt_cte_valor_iva_23_total': iva_total_normal,
+            'tt_cte_subtotal_civa': custo_subtotal_c_iva, 
+            'tt_cte_desc_finais_valor': desconto_total_final_eur, 
+            'tt_cte_acres_finais_valor': acrescimo_total_final_eur 
+        }
+
+        return {
+            'NomeParaExibir': nome_a_exibir_final, 
+            'Comercializador': dados_tarifa_gas_linha['Comercializador'],
+            'Termo Fixo (€/dia)': round(preco_fixo_final_s_iva_dia, 5), 
+            'Termo Energia (€/kWh)': round(preco_energia_final_s_iva_kwh, 5),
+            'Total Período (€)': round(custo_final_total_periodo_c_iva, 2), 
+            'tipo': tipo_tarifa,
+            'Segmento': dados_tarifa_gas_linha.get('segmento', '-'),
+            'Faturação': dados_tarifa_gas_linha.get('faturacao', '-'),
+            'Pagamento': dados_tarifa_gas_linha.get('pagamento', '-'),
+            **componentes_tooltip_termo_fixo_dict,
+            **componentes_tooltip_termo_energia_dict,
+            **componentes_tooltip_custo_total_dict
+        }
+        
+    except Exception as e:
+        st.error(f"Erro ao calcular custo de gás (V15) para {dados_tarifa_gas_linha.get('Nome_Tarifa_G', 'Desconhecido')}: {e}")
+        import traceback
+        st.text(traceback.format_exc()) # Para debug detalhado
+        return None
+    
+# --- NOVA FUNÇÃO: Calcular "O Meu Tarifário" de Gás ---
+def calcular_custo_meu_tarifario_gas(
+    st_session_state, 
+    consumo_kwh_periodo,
+    dias_periodo,
+    escalao_num,
+    tarifa_social_ativa,
+    constantes_df,
+    tos_fixo_dia_val,
+    tos_variavel_kwh_val,
+    isp_gas_valor_manual
+):
+    """
+    Calcula 'O Meu Tarifário', lógica V11 (TS subtrai ao preço final),
+    DEVOLVE DICIONÁRIOS DE TOOLTIP completos e colunas de Segmento (Pessoal).
+    """
+    try:
+        IVA_NORMAL_PERC = 0.23
+        IVA_REDUZIDO_PERC = 0.06
+
+        # 1. Obter inputs do utilizador
+        preco_fixo_input_dia = float(st_session_state.get('meu_termo_fixo_gas', 0.0) or 0.0)
+        preco_energia_input_kwh = float(st_session_state.get('meu_termo_energia_gas', 0.0) or 0.0)
+        
+        desc_fixo_perc = float(st_session_state.get('meu_gas_desconto_fixo_perc', 0.0) or 0.0)
+        desc_energia_perc = float(st_session_state.get('meu_gas_desconto_energia_perc', 0.0) or 0.0)
+        desc_fatura_eur_periodo = float(st_session_state.get('meu_gas_desconto_fatura_eur', 0.0) or 0.0)
+        acresc_fatura_eur_periodo = float(st_session_state.get('meu_gas_acrescimo_fatura_eur', 0.0) or 0.0)
+        
+        # 2. Obter Constantes (TARs, ISP)
+        tar_fixo_regulada_base_dia = obter_tar_gas_fixo(escalao_num, constantes_df)
+        tar_energia_regulada_base_kwh = obter_tar_gas_energia(escalao_num, constantes_df)
+        isp_gas_kwh = isp_gas_valor_manual 
+
+        # 3. Aplicar Tarifa Social (TS) - Afeta TARs e ISP
+        tar_fixo_final_pos_ts_dia = tar_fixo_regulada_base_dia
+        tar_energia_final_pos_ts_kwh = tar_energia_regulada_base_kwh
+        isp_total_s_iva_periodo = consumo_kwh_periodo * isp_gas_kwh 
+
+        desconto_ts_fixo_valor_aplicado = 0.0
+        desconto_ts_energia_valor_aplicado = 0.0
+
+        if tarifa_social_ativa and escalao_num in [1, 2]:
+            desconto_ts_fixo_bruto = obter_desconto_ts_gas_fixo(escalao_num, constantes_df)
+            desconto_ts_energia_bruto = obter_desconto_ts_gas_energia(escalao_num, constantes_df)
+            
+            tar_fixo_final_pos_ts_dia = max(0.0, tar_fixo_regulada_base_dia - desconto_ts_fixo_bruto)
+            tar_energia_final_pos_ts_kwh = max(0.0, tar_energia_regulada_base_kwh - desconto_ts_energia_bruto)
+            
+            desconto_ts_fixo_valor_aplicado = tar_fixo_regulada_base_dia - tar_fixo_final_pos_ts_dia
+            desconto_ts_energia_valor_aplicado = tar_energia_regulada_base_kwh - tar_energia_final_pos_ts_kwh
+
+            isp_total_s_iva_periodo = 0.0
+            
+        # --- 4. APLICAR LÓGICA DE DESCONTO COMERCIAL E TS (V11) ---
+        preco_fixo_pos_desc_perc = preco_fixo_input_dia * (1 - desc_fixo_perc / 100.0)
+        preco_energia_pos_desc_perc = preco_energia_input_kwh * (1 - desc_energia_perc / 100.0)
+        preco_fixo_final_cobrar_dia = preco_fixo_pos_desc_perc - desconto_ts_fixo_valor_aplicado
+        preco_energia_final_cobrar_kwh = preco_energia_pos_desc_perc - desconto_ts_energia_valor_aplicado
+        comp_fixo_comerc_final_dia = preco_fixo_final_cobrar_dia - tar_fixo_final_pos_ts_dia
+        comp_energia_comerc_final_kwh = preco_energia_final_cobrar_kwh - tar_energia_final_pos_ts_kwh
+
+        # --- 5. MONTAR OS "BALDES" DE IVA ---
+        custo_tar_fixo_periodo_s_iva = tar_fixo_final_pos_ts_dia * dias_periodo
+        custo_tar_energia_periodo_s_iva = tar_energia_final_pos_ts_kwh * consumo_kwh_periodo
+        custo_comerc_fixo_periodo_s_iva = comp_fixo_comerc_final_dia * dias_periodo
+        custo_comerc_energia_periodo_s_iva = comp_energia_comerc_final_kwh * consumo_kwh_periodo
+        custo_tos_fixo_periodo_s_iva = tos_fixo_dia_val * dias_periodo
+        custo_tos_variavel_periodo_s_iva = tos_variavel_kwh_val * consumo_kwh_periodo
+
+        total_base_iva_reduzido = custo_tar_fixo_periodo_s_iva
+        total_base_iva_normal = (
+            custo_comerc_fixo_periodo_s_iva +
+            custo_tar_energia_periodo_s_iva +
+            custo_comerc_energia_periodo_s_iva +
+            isp_total_s_iva_periodo +
+            custo_tos_fixo_periodo_s_iva +
+            custo_tos_variavel_periodo_s_iva
+        )
+
+        iva_total_reduzido = total_base_iva_reduzido * IVA_REDUZIDO_PERC
+        iva_total_normal = total_base_iva_normal * IVA_NORMAL_PERC
+        iva_total_periodo = iva_total_reduzido + iva_total_normal
+
+        # 6. Custo Subtotal
+        custo_subtotal_c_iva = total_base_iva_reduzido + total_base_iva_normal + iva_total_periodo
+        
+        # 7. Descontos/Acréscimos Finais de Fatura
+        custo_final_com_tudo = custo_subtotal_c_iva - desc_fatura_eur_periodo + acresc_fatura_eur_periodo
+        
+        # 8. Preços Unitários Finais (para exibição)
+        preco_fixo_final_s_iva_dia = preco_fixo_final_cobrar_dia
+        preco_energia_final_s_iva_kwh = preco_energia_final_cobrar_kwh
+
+        # --- 9. Construir Dicionários de Tooltip ---
+        componentes_tooltip_termo_fixo_dict = {
+            'tooltip_fixo_comerc_sem_tar': comp_fixo_comerc_final_dia, 
+            'tooltip_fixo_tar_bruta': tar_fixo_regulada_base_dia,
+            'tooltip_fixo_ts_aplicada_flag': tarifa_social_ativa and escalao_num in [1, 2],
+            'tooltip_fixo_ts_desconto_valor': desconto_ts_fixo_valor_aplicado
+        }
+        componentes_tooltip_termo_energia_dict = {
+            'tooltip_energia_comerc_sem_tar': comp_energia_comerc_final_kwh, 
+            'tooltip_energia_tar_bruta': tar_energia_regulada_base_kwh,
+            'tooltip_energia_ts_aplicada_flag': tarifa_social_ativa and escalao_num in [1, 2],
+            'tooltip_energia_ts_desconto_valor': desconto_ts_energia_valor_aplicado
+        }
+        componentes_tooltip_custo_total_dict = {
+            'tt_cte_energia_siva': custo_tar_energia_periodo_s_iva + custo_comerc_energia_periodo_s_iva,
+            'tt_cte_fixo_siva': custo_tar_fixo_periodo_s_iva + custo_comerc_fixo_periodo_s_iva,
+            'tt_cte_isp_siva': isp_total_s_iva_periodo,
+            'tt_cte_tos_fixo_siva': custo_tos_fixo_periodo_s_iva,
+            'tt_cte_tos_var_siva': custo_tos_variavel_periodo_s_iva,
+            'tt_cte_total_siva': total_base_iva_reduzido + total_base_iva_normal,
+            'tt_cte_valor_iva_6_total': iva_total_reduzido,
+            'tt_cte_valor_iva_23_total': iva_total_normal,
+            'tt_cte_subtotal_civa': custo_subtotal_c_iva,
+            'tt_cte_desc_finais_valor': desc_fatura_eur_periodo,
+            'tt_cte_acres_finais_valor': acresc_fatura_eur_periodo
+        }
+        
+        return {
+            # --- Colunas Principais para AgGrid ---
+            'NomeParaExibir': "O Meu Tarifário (Gás)",
+            'Comercializador': "Pessoal",
+            'Termo Fixo (€/dia)': round(preco_fixo_final_s_iva_dia, 5),
+            'Termo Energia (€/kWh)': round(preco_energia_final_s_iva_kwh, 5),
+            'Total Período (€)': round(custo_final_com_tudo, 2),
+            'tipo': "Pessoal",
+            
+            # --- Colunas de Detalhe (para vista normal) ---
+            'Segmento': "Pessoal",
+            'Faturação': "-",
+            'Pagamento': "-",
+
+            # --- NOVAS CHAVES PARA LINKS E NOTAS ---
+            'LinkAdesao': "-",
+            'info_notas': "Tarifário pessoal configurado pelo utilizador.",
+
+            # --- Dicionários de Tooltip ---
+            **componentes_tooltip_termo_fixo_dict,
+            **componentes_tooltip_termo_energia_dict,
+            **componentes_tooltip_custo_total_dict
+        }
+
+    except Exception as e:
+        st.error(f"Erro ao calcular 'O Meu Tarifário Gás': {e}")
+        return None
+    
+def calcular_custo_personalizado_gas(
+    st_session_state_inputs, # Dicionário de inputs do st.session_state
+    consumo_kwh_periodo,    
+    dias_periodo,           
+    escalao_num,
+    tarifa_social_ativa,
+    constantes_df,
+    tos_fixo_dia_val,        
+    tos_variavel_kwh_val,   
+    isp_gas_valor_manual
+):
+    """
+    (V1 - Gás) Calcula o custo para o "Tarifário Personalizado", replicando a lógica
+    dos outros cálculos de gás (V13) e devolvendo todos os dicionários de tooltip.
+    """
+    try:
+        IVA_NORMAL_PERC = 0.23
+        IVA_REDUZIDO_PERC = 0.06
+
+        # 1. Obter inputs do utilizador (via st.session_state_inputs)
+        preco_fixo_input_dia = float(st_session_state_inputs.get('pers_gas_fixo', 0.0) or 0.0)
+        preco_energia_input_kwh = float(st_session_state_inputs.get('pers_gas_energia', 0.0) or 0.0)
+        
+        # Flags
+        tar_fixo_incluida_flag = st_session_state_inputs.get('pers_gas_tar_fixo', True)
+        tar_energia_incluida_flag = st_session_state_inputs.get('pers_gas_tar_energia', True)
+
+        # 2. Obter TARs Reguladas (Base)
+        tar_fixo_regulada_base = obter_tar_gas_fixo(escalao_num, constantes_df)
+        tar_energia_regulada_base = obter_tar_gas_energia(escalao_num, constantes_df)
+        
+        # 3. Obter ISP
+        isp_gas_kwh = isp_gas_valor_manual 
+
+        # 4. Determinar componentes do Comercializador
+        comp_fixo_comercializador_dia = (preco_fixo_input_dia - tar_fixo_regulada_base) if tar_fixo_incluida_flag else preco_fixo_input_dia
+        comp_energia_comercializador_kwh = (preco_energia_input_kwh - tar_energia_regulada_base) if tar_energia_incluida_flag else preco_energia_input_kwh
+
+        # 5. Aplicar Tarifa Social (TS)
+        tar_fixo_final_a_pagar = tar_fixo_regulada_base
+        tar_energia_final_a_pagar = tar_energia_regulada_base
+        isp_total_s_iva_periodo = consumo_kwh_periodo * isp_gas_kwh 
+        
+        desconto_ts_fixo_valor_aplicado = 0.0
+        desconto_ts_energia_valor_aplicado = 0.0
+
+        if tarifa_social_ativa and escalao_num in [1, 2]: 
+            desconto_ts_fixo_bruto = obter_desconto_ts_gas_fixo(escalao_num, constantes_df)
+            desconto_ts_energia_bruto = obter_desconto_ts_gas_energia(escalao_num, constantes_df)
+            
+            tar_fixo_final_a_pagar = max(0.0, tar_fixo_regulada_base - desconto_ts_fixo_bruto)
+            tar_energia_final_a_pagar = max(0.0, tar_energia_regulada_base - desconto_ts_energia_bruto)
+            
+            desconto_ts_fixo_valor_aplicado = tar_fixo_regulada_base - tar_fixo_final_a_pagar
+            desconto_ts_energia_valor_aplicado = tar_energia_regulada_base - tar_energia_final_a_pagar
+            
+            isp_total_s_iva_periodo = 0.0
+            
+        # 6. Preços Unitários Finais (Sem IVA)
+        preco_fixo_final_s_iva_dia = comp_fixo_comercializador_dia + tar_fixo_final_a_pagar
+        preco_energia_final_s_iva_kwh = comp_energia_comercializador_kwh + tar_energia_final_a_pagar
+
+        # 7. Lógica de Custo (IVA)
+        custo_tar_fixo_periodo_s_iva = tar_fixo_final_a_pagar * dias_periodo
+        custo_comerc_fixo_periodo_s_iva = comp_fixo_comercializador_dia * dias_periodo
+        custo_tar_energia_periodo_s_iva = tar_energia_final_a_pagar * consumo_kwh_periodo
+        custo_comerc_energia_periodo_s_iva = comp_energia_comercializador_kwh * consumo_kwh_periodo
+        custo_tos_fixo_periodo_s_iva = tos_fixo_dia_val * dias_periodo
+        custo_tos_variavel_periodo_s_iva = tos_variavel_kwh_val * consumo_kwh_periodo
+
+        total_base_iva_reduzido = custo_tar_fixo_periodo_s_iva
+        total_base_iva_normal = (
+            custo_comerc_fixo_periodo_s_iva +
+            custo_tar_energia_periodo_s_iva +
+            custo_comerc_energia_periodo_s_iva +
+            isp_total_s_iva_periodo + 
+            custo_tos_fixo_periodo_s_iva +
+            custo_tos_variavel_periodo_s_iva 
+        )
+
+        iva_total_reduzido = total_base_iva_reduzido * IVA_REDUZIDO_PERC
+        iva_total_normal = total_base_iva_normal * IVA_NORMAL_PERC
+        iva_total_periodo = iva_total_reduzido + iva_total_normal
+
+        custo_final_total_periodo_c_iva = total_base_iva_reduzido + total_base_iva_normal + iva_total_periodo
+
+        # 8. Construir Dicionários de Tooltip
+        componentes_tooltip_termo_fixo_dict = {
+            'tooltip_fixo_comerc_sem_tar': comp_fixo_comercializador_dia,
+            'tooltip_fixo_tar_bruta': tar_fixo_regulada_base,
+            'tooltip_fixo_ts_aplicada_flag': tarifa_social_ativa and escalao_num in [1, 2],
+            'tooltip_fixo_ts_desconto_valor': desconto_ts_fixo_valor_aplicado
+        }
+        
+        componentes_tooltip_termo_energia_dict = {
+            'tooltip_energia_comerc_sem_tar': comp_energia_comercializador_kwh,
+            'tooltip_energia_tar_bruta': tar_energia_regulada_base,
+            'tooltip_energia_ts_aplicada_flag': tarifa_social_ativa and escalao_num in [1, 2],
+            'tooltip_energia_ts_desconto_valor': desconto_ts_energia_valor_aplicado
+        }
+
+        componentes_tooltip_custo_total_dict = {
+            'tt_cte_energia_siva': custo_tar_energia_periodo_s_iva + custo_comerc_energia_periodo_s_iva,
+            'tt_cte_fixo_siva': custo_tar_fixo_periodo_s_iva + custo_comerc_fixo_periodo_s_iva,
+            'tt_cte_isp_siva': isp_total_s_iva_periodo,
+            'tt_cte_tos_fixo_siva': custo_tos_fixo_periodo_s_iva,
+            'tt_cte_tos_var_siva': custo_tos_variavel_periodo_s_iva,
+            'tt_cte_total_siva': total_base_iva_reduzido + total_base_iva_normal,
+            'tt_cte_valor_iva_6_total': iva_total_reduzido,
+            'tt_cte_valor_iva_23_total': iva_total_normal,
+            'tt_cte_subtotal_civa': total_base_iva_reduzido + total_base_iva_normal + iva_total_periodo,
+            'tt_cte_desc_finais_valor': 0.0,
+            'tt_cte_acres_finais_valor': 0.0
+        }
+
+        return {
+            # --- Colunas Principais para AgGrid ---
+            'NomeParaExibir': "Tarifário Personalizado (Gás)",
+            'Comercializador': "Personalizado",
+            'Termo Fixo (€/dia)': round(preco_fixo_final_s_iva_dia, 5), 
+            'Termo Energia (€/kWh)': round(preco_energia_final_s_iva_kwh, 5),
+            'Total Período (€)': round(custo_final_total_periodo_c_iva, 2),
+            'tipo': "Pessoal", # Usa o tipo 'Pessoal' para partilhar a cor verde/vermelha
+            
+            'Segmento': "Pessoal",
+            'Faturação': "-",
+            'Pagamento': "-",
+            'LinkAdesao': "-",
+            'info_notas': "Tarifário personalizado configurado pelo utilizador.",
+            
+            # --- Dicionários de Tooltip ---
+            **componentes_tooltip_termo_fixo_dict,
+            **componentes_tooltip_termo_energia_dict,
+            **componentes_tooltip_custo_total_dict
+        }
+        
+    except Exception as e:
+        st.error(f"Erro ao calcular 'Tarifário Personalizado Gás': {e}")
+        return None
+    
+def calcular_media_mibgas_datas(df_gwdes, data_inicio, data_fim):
+    """
+    Calcula o preço médio do MIBGAS (€/MWh) de um DataFrame GWDES para um período específico.
+    VERSÃO ATUALIZADA: Assume que a aba GWDES tem preços DIÁRIOS (coluna 'Data') e não horários ('DataHora').
+    
+    data_inicio e data_fim SÃO objetos datetime.date (vindos do st.date_input).
+    """
+    if df_gwdes.empty:
+        st.warning("A aba 'GWDES' (MIBGAS) está vazia ou não foi carregada.")
+        return 0.0
+
+    # --- DEFINIR NOMES DAS COLUNAS ESPERADAS NO EXCEL (NA ABA GWDES) ---
+    coluna_data = 'Data'
+    coluna_preco_mibgas = 'Preço' 
+    # -----------------------------------------------------------------
+
+    # Verificar se as colunas necessárias existem
+    if coluna_data not in df_gwdes.columns:
+        st.error(f"Erro Crítico: A sua aba 'GWDES' no Excel não tem uma coluna chamada '{coluna_data}'. Não é possível calcular a média MIBGAS.")
+        return 0.0
+    
+    if coluna_preco_mibgas not in df_gwdes.columns:
+        st.error(f"Erro Crítico: A sua aba 'GWDES' no Excel não tem uma coluna chamada '{coluna_preco_mibgas}'.")
+        return 0.0
+
+    try:
+        # 1. Processar a coluna 'Data'. Vindo do Excel, pode já ser datetime.
+        # Convertemos para datetime e depois extraímos APENAS a data (.dt.date) para garantir 
+        # que removemos quaisquer componentes de hora (como 00:00:00).
+        df_gwdes[coluna_data] = pd.to_datetime(df_gwdes[coluna_data], errors='coerce').dt.date
+        
+        # 2. Garantir que o preço é numérico
+        df_gwdes[coluna_preco_mibgas] = pd.to_numeric(df_gwdes[coluna_preco_mibgas], errors='coerce')
+
+        # 3. Remover linhas onde a conversão falhou
+        df_gwdes.dropna(subset=[coluna_data, coluna_preco_mibgas], inplace=True)
+        if df_gwdes.empty:
+            st.error("Aba GWDES processada está vazia (verifique formato de datas e preços).")
+            return 0.0
+
+    except Exception as e:
+        st.error(f"Erro ao processar dados da aba GWDES: {e}")
+        return 0.0
+
+    # 4. Filtrar o DataFrame. Agora comparamos data com data (ambos são datetime.date).
+    # Isto é muito mais simples do que o filtro datetime.
+    df_periodo = df_gwdes[
+        (df_gwdes[coluna_data] >= data_inicio) &
+        (df_gwdes[coluna_data] <= data_fim)
+    ].copy()
+
+    if df_periodo.empty:
+        st.warning(f"Não foram encontrados dados MIBGAS (na aba GWDES) para o período de {data_inicio.strftime('%Y-%m-%d')} a {data_fim.strftime('%Y-%m-%d')}.")
+        return 0.0
+
+    # 5. Calcular a média e devolver
+    media_mibgas = df_periodo[coluna_preco_mibgas].mean()
+    
+    if pd.isna(media_mibgas) or media_mibgas == 0.0:
+        st.warning("A média MIBGAS calculada é zero ou inválida para o período.")
+        return 0.0  # Retorna 0.0 para acionar o fallback (Default das Constantes) no script principal
+        
+    return round(media_mibgas, 2)

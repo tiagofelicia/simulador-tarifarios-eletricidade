@@ -20,8 +20,8 @@ st.set_page_config(page_title="Simulador de Tarifários Eletricidade 2025: Poupe
 
 # --- Carregar ficheiro Excel do GitHub ---
 
-url_excel = "https://github.com/tiago1978/simulador-tarifarios-eletricidade/raw/refs/heads/main/TiagoFelicia_Simulador_Eletricidade.xlsx"
-tarifarios_fixos, tarifarios_indexados, OMIE_PERDAS_CICLOS, CONSTANTES = proc_dados.carregar_dados_excel(url_excel)
+url_excel = "https://github.com/tiagofelicia/simulador-tarifarios-eletricidade/raw/refs/heads/main/Tarifarios_%F0%9F%94%8C_Eletricidade_Tiago_Felicia.xlsx"
+tarifarios_fixos, tarifarios_indexados, OMIE_PERDAS_CICLOS, CONSTANTES = proc_dados.carregar_dados_excel_elec(url_excel)
 
 potencias_validas = [1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7, 27.6, 34.5, 41.4]
 opcoes_horarias_existentes = list(tarifarios_fixos['opcao_horaria_e_ciclo'].dropna().unique())
@@ -949,7 +949,7 @@ st.button(
 # INÍCIO DO BLOCO - GUIA RÁPIDO
 # ##################################################################
 
-with st.expander("❓ Como Usar o Simulador de Tarifários (Guia Rápido)", expanded=False):
+with st.expander("❓ Como Usar o Simulador de Tarifários de Eletricidade (Guia Rápido)", expanded=False):
     st.markdown("""
     Bem-vindo! Esta ferramenta ajuda-o a descobrir o tarifário de eletricidade mais económico para si. Siga os passos abaixo para começar a poupar.
 
@@ -1545,7 +1545,7 @@ else:
 
     dias_default_calculado = (data_fim - data_inicio).days + 1 if data_fim >= data_inicio else 0
     with col_dias_man:
-        dias_manual_input_val = st.number_input("Nº Dias (manual)", min_value=0, value=st.session_state.get('dias_manual_val', dias_default_calculado), step=1, key="dias_manual_input_key", help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos nos tarifários indexados")
+        dias_manual_input_val = st.number_input("Nº Dias (manual)", min_value=0, value=st.session_state.get('dias_manual_val', dias_default_calculado), step=1, key="dias_manual_input_key", help="Pode alterar os dias de forma manual, mas dê preferência às datas ou mês, para ter dados mais fidedignos nos tarifários indexados.")
         st.session_state['dias_manual_val'] = dias_manual_input_val
 
     if pd.isna(dias_manual_input_val) or dias_manual_input_val <= 0:
@@ -2247,12 +2247,12 @@ with st.expander("➕ Opções Adicionais de Simulação (Tarifa Social e condic
         with colx1:
             tarifa_social = st.checkbox("Tarifa Social",
                                         key="chk_tarifa_social",
-                                        help="Só pode ter Tarifa Social para potências até 6.9 kVA",
+                                        help="Só pode ter Tarifa Social para potências até 6.9 kVA.",
                                         on_change=atualizar_url_opcoes_adicionais)
         with colx2:
             familia_numerosa = st.checkbox("Família Numerosa",
                                         key="chk_familia_numerosa",
-                                        help="300 kWh com IVA a 6% (em vez dos normais 200 kWh) para potências até 6.9 kVA",
+                                        help="300 kWh com IVA a 6% (em vez dos normais 200 kWh) para potências até 6.9 kVA.",
                                         on_change=atualizar_url_opcoes_adicionais)
     else:
         tarifa_social = False
@@ -2274,7 +2274,7 @@ with st.expander("➕ Opções Adicionais de Simulação (Tarifa Social e condic
             incluir_quota_acp = st.checkbox(
                 "Incluir Quota ACP",
                 key='chk_acp',
-                help="Inclui o valor da quota do ACP (4,80 €/mês) no valor do tarifário da parceria GE/ACP",
+                help="Inclui o valor da quota do ACP (4,80 €/mês) no valor do tarifário da parceria GE/ACP.",
                 on_change=atualizar_url_opcoes_adicionais
             )
         with colx4:
@@ -2282,7 +2282,7 @@ with st.expander("➕ Opções Adicionais de Simulação (Tarifa Social e condic
             desconto_continente = st.checkbox(
                 "Desconto Continente",
                 key='chk_continente',
-                help="Comparar o custo total incluindo o desconto do valor do cupão Continente no tarifário Galp&Continente",
+                help="Comparar o custo total incluindo o desconto do valor do cupão Continente no tarifário Galp&Continente.",
                 on_change=atualizar_url_opcoes_adicionais
             )
     else:
@@ -5439,7 +5439,8 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
         key="chk_vista_simplificada"
         )
 
-    st.write("Total com todos os componentes, taxas e impostos e Valores unitários sem IVA")
+    st.write("**Total** com todos os componentes, taxas e impostos e **valores unitários** de **Energia e Potência** sem IVA")
+    st.write("**O nome do tarifário tem link para mais informações/adesão sobre o mesmo.**")
 
     st.markdown("➡️ [**Exportar Tabela Detalhada para Excel**](#exportar-excel-detalhada)")
 
@@ -7858,20 +7859,21 @@ st.subheader("Redes sociais, onde poderão seguir o projeto:")
 
 # URLs das redes sociais
 url_x = "https://x.com/tiagofelicia"
-url_bluesky = "https://bsky.app/profile/tiagofelicia.bsky.social"
+url_facebook = "https://www.facebook.com/profile.php?id=61555007360529"
+url_instagram = "https://www.instagram.com/tiago_felicia/"
 url_youtube = "https://youtube.com/@tiagofelicia"
-url_facebook_perfil = "https://www.facebook.com/profile.php?id=61555007360529"
-
+url_tiktok = "https://www.tiktok.com/@Tiago_Felicia"
 
 icon_url_x = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/X_icon.svg/120px-X_icon.svg.png?20250519203220"
-icon_url_bluesky = "https://upload.wikimedia.org/wikipedia/commons/7/7a/Bluesky_Logo.svg"
-icon_url_youtube = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/YouTube_full-color_icon_%282024%29.svg/120px-YouTube_full-color_icon_%282024%29.svg.png"
 icon_url_facebook = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/2023_Facebook_icon.svg/120px-2023_Facebook_icon.svg.png"
+icon_url_instagram = "https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png"
+icon_url_youtube = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fd/YouTube_full-color_icon_%282024%29.svg/120px-YouTube_full-color_icon_%282024%29.svg.png"
+icon_url_tiktok = "https://upload.wikimedia.org/wikipedia/commons/a/a6/Tiktok_icon.svg"
 
 
 svg_icon_style_dark_mode_friendly = "filter: invert(0.8) sepia(0) saturate(1) hue-rotate(0deg) brightness(1.5) contrast(0.8);"
 
-col_social1, col_social2, col_social3, col_social4 = st.columns(4)
+col_social1, col_social2, col_social3, col_social4, col_social5 = st.columns(5)
 
 with col_social1:
     st.markdown(
@@ -7887,15 +7889,26 @@ with col_social1:
 with col_social2:
     st.markdown(
         f"""
-        <a href="{url_bluesky}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
-            <img src="{icon_url_bluesky}" width="40" alt="Bluesky" style="margin-bottom: 8px; object-fit: contain;">
-            Bluesky
+        <a href="{url_facebook}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_facebook}" width="40" alt="Facebook" style="margin-bottom: 8px; object-fit: contain;">
+            Facebook
         </a>
         """,
         unsafe_allow_html=True
     )
 
 with col_social3:
+    st.markdown(
+        f"""
+        <a href="{url_instagram}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_instagram}" width="40" alt="Instagram" style="margin-bottom: 8px; object-fit: contain;">
+            Instagram
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+with col_social4:
     st.markdown(
         f"""
         <a href="{url_youtube}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
@@ -7906,23 +7919,22 @@ with col_social3:
         unsafe_allow_html=True
     )
 
-with col_social4:
+with col_social5:
     st.markdown(
         f"""
-        <a href="{url_facebook_perfil}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
-            <img src="{icon_url_facebook}" width="40" alt="Facebook" style="margin-bottom: 8px; object-fit: contain;">
-            Facebook
+        <a href="{url_tiktok}" target="_blank" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; align-items: center; text-align: center;">
+            <img src="{icon_url_tiktok}" width="40" alt="Tiktok" style="margin-bottom: 8px; object-fit: contain;">
+            Tiktok
         </a>
         """,
         unsafe_allow_html=True
     )
-
 st.markdown("<br>", unsafe_allow_html=True) # Adiciona um espaço vertical
 
 # Texto de Copyright
 ano_copyright = 2025
 nome_autor = "Tiago Felícia"
-texto_copyright_html = f"© {ano_copyright} Todos os direitos reservados | {nome_autor} | <a href='{url_facebook_perfil}' target='_blank' style='color: inherit;'>Facebook</a>"
+texto_copyright_html = f"© {ano_copyright} Todos os direitos reservados | {nome_autor}"
 
 st.markdown(
     f"<div style='text-align: center; font-size: 0.9em; color: grey;'>{texto_copyright_html}</div>",
