@@ -2,7 +2,7 @@ name: Atualizar Dados MIBEL
 
 on:
   schedule:
-    - cron: '57 10 * * 0-6'
+    - cron: '57 10 * * *'
     - cron: '55 17 * * 1-5'
   workflow_dispatch:
 
