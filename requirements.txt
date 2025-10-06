@@ -5,3 +5,4 @@ streamlit-aggrid==1.1.4.post1
 openpyxl
 beautifulsoup4
 requests
+python-calamine
