@@ -356,8 +356,8 @@ def run_update_process():
             
         sheet_const = wb["Constantes"]
         ultima_data_omie = dados_combinados_qh['Data'].max()
-        sheet_const['B90'] = ultima_data_omie.strftime('%d/%m/%Y')
-        sheet_const['B91'] = data_relatorio_omip.strftime('%d/%m/%Y')
+        sheet_const['B90'] = ultima_data_omie.strftime('%m/%d/%Y')
+        sheet_const['B91'] = data_relatorio_omip.strftime('%m/%d/%Y')
 
         wb.save(FICHEIRO_EXCEL)
         print(f"✅ O ficheiro Excel foi atualizado com sucesso!\n   Data_Valores_OMIE = {ultima_data_omie.date()}\n   Data_Valores_OMIP = {data_relatorio_omip.date()}")
