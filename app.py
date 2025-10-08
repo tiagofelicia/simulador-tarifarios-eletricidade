@@ -4931,7 +4931,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                                     elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
                                     elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
                                     elif nome_tarifario == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil = (omie * constantes.get('G9_FA', 0.0) * perdas + constantes.get('G9_CGS', 0.0) + constantes.get('G9_AC', 0.0))
-                                    elif nome_tarifario == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil = (omie * perdas + constantes.get("Iberdrola_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0))
+                                    elif nome_tarifario == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil = (omie * perdas + constantes.get("Iberdrola_Dinamico_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0))
 
 
                                     else: calculo_instantaneo_sem_perfil = omie * perdas # Fallback genérico
@@ -4997,7 +4997,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                         if opcao_horaria.lower() == "simples":
                             perdas_a_usar = perdas_medias.get('Perdas_Anual_S', 1.0) # Usa Anual Simples
                             omie_a_usar = omie_medio_simples_input_kwh if omie_medio_simples_input_kwh is not None else 0.0
-                            if nome_tarifario == "Iberdrola - Simples Indexado": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('Iberdrola_Perdas', 1.0) + constantes.get("Iberdrola_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0), prec)
+                            if nome_tarifario == "Iberdrola - Simples Indexado": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('Iberdrola_Perdas', 1.0) + constantes.get("Iberdrola_Media_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0), prec)
                             elif nome_tarifario == "Goldenergy - Tarifário Indexado 100%":
                                 mes_num_calculo = list(dias_mes.keys()).index(mes) + 1; perdas_mensais_ge_map = {1: 1.29, 2: 1.18, 3: 1.18, 4: 1.15, 5: 1.11, 6: 1.10, 7: 1.15, 8: 1.13, 9: 1.10, 10: 1.10, 11: 1.16, 12: 1.25}; perdas_mensais_ge = perdas_mensais_ge_map.get(mes_num_calculo, 1.0)
                                 preco_energia_simples_indexado = round(omie_a_usar * perdas_mensais_ge + constantes.get('GE_Q_Tarifa', 0.0) + constantes.get('GE_CG', 0.0), prec)
