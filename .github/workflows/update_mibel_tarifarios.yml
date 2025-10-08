@@ -1,0 +1,82 @@
+# --- update_mibel_tarifarios.yml ---
+name: Atualizar Dados MIBEL (Tarifários)
+
+on:
+  schedule:
+    - cron: '57 10 * * *'    # Executa todos os dias às 10:57 UTC
+    - cron: '27 17 * * 1-5'  # Executa de Seg a Sex às 17:27 UTC
+  workflow_dispatch:           # Permite execução manual
+
+jobs:
+  run-python-job:
+    name: Executar Atualização MIBEL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Necessário para fazer commit das alterações
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # --- CONFIGURAÇÃO DO AMBIENTE PYTHON ---
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # --- CACHE E INSTALAÇÃO DE DEPENDÊNCIAS PYTHON ---
+      - name: Cache das dependências Python
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip # Pasta onde o pip guarda o cache
+          # Chave única para o cache. Se o requirements mudar, o cache é recriado.
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_atualizacao_tarifarios_MIBEL.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Instalar dependências Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_atualizacao_tarifarios_MIBEL.txt
+
+      # --- EXECUÇÃO DO SCRIPT PYTHON ---
+      - name: Executar script de atualização Python com logging
+        run: |
+          mkdir -p logs
+          start_time=$(date +%s)
+          echo "=== Execução Python iniciada em $(date -d @$start_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_tarifarios_MIBEL.log
+          
+          # Assumindo que o script está na pasta 'scripts'
+          python scripts/atualizacao_tarifarios_MIBEL.py >> logs/atualizacao_tarifarios_MIBEL.log 2>&1
+          
+          end_time=$(date +%s)
+          echo "=== Execução terminada em $(date -d @$end_time '+%Y-%m-%d %H:%M:%S') ===" >> logs/atualizacao_tarifarios_MIBEL.log
+          runtime=$((end_time-start_time))
+          echo "Duração total: ${runtime} segundos." >> logs/atualizacao_tarifarios_MIBEL.log
+
+      - name: Fazer upload do log como artefacto
+        if: always() # Executa sempre, mesmo que o passo anterior falhe
+        uses: actions/upload-artifact@v4
+        with:
+          name: atualizacao_tarifarios_MIBEL.log
+          path: logs/atualizacao_tarifarios_MIBEL.log
+
+      # --- COMMIT E PUSH DAS ALTERAÇÕES ---
+      - name: Verificar se houve alterações
+        id: git-check
+        run: |
+          git add -A
+          if git diff --cached --quiet;
+          then
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit e push se houver alterações
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "📊 Dados MIBEL (Tarifários) atualizados automaticamente"
+          git push
