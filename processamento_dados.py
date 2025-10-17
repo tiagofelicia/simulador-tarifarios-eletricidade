@@ -151,7 +151,7 @@ def processar_ficheiro_consumos(ficheiro_excel):
 def validar_e_juntar_ficheiros(lista_de_ficheiros):
     """
     Processa uma lista de ficheiros da E-Redes, junta os dados, e filtra para incluir
-    apenas registos a partir de 01/01/2025, alertando o utilizador se dados mais
+    apenas registos a partir de 01/10/2024, alertando o utilizador se dados mais
     antigos foram ignorados (Lógica Robusta).
     """
     if not lista_de_ficheiros:
@@ -160,7 +160,7 @@ def validar_e_juntar_ficheiros(lista_de_ficheiros):
     dataframes_processados = []
     intervalos_de_datas = []
     
-    data_limite_dt = pd.to_datetime('2025-01-01')
+    data_limite_dt = pd.to_datetime('2024-10-01')
     dados_antigos_encontrados = False # Flag para o aviso
 
     for ficheiro in lista_de_ficheiros:
@@ -197,7 +197,7 @@ def validar_e_juntar_ficheiros(lista_de_ficheiros):
         intervalos_de_datas.append((min_data, max_data))
 
     if not dataframes_processados:
-        return None, "Nenhum dos ficheiros continha dados válidos a partir de 01/01/2025."
+        return None, "Nenhum dos ficheiros continha dados válidos a partir de 01/10/2024."
 
     # Lógica de verificação de sobreposição (mantém-se igual)
     if len(intervalos_de_datas) > 1:
@@ -213,7 +213,7 @@ def validar_e_juntar_ficheiros(lista_de_ficheiros):
     # Lógica de retorno da mensagem (mantém-se igual)
     mensagem_retorno = None
     if dados_antigos_encontrados:
-        mensagem_retorno = "Aviso: Foram encontrados e ignorados dados anteriores a 01/01/2025."
+        mensagem_retorno = "Aviso: Foram encontrados e ignorados dados anteriores a 01/10/2024."
 
     return df_final_combinado, mensagem_retorno
 
