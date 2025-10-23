@@ -3,8 +3,19 @@ name: Atualizar Dados MIBEL (Tarifários)
 
 on:
   schedule:
-    - cron: '57 10 * * *'    # Executa todos os dias às 10:57 UTC
-    - cron: '27 17 * * 1-5'  # Executa de Seg a Sex às 17:27 UTC
+    # Corre todos os dias às 10:40 UTC
+    - cron: '40 10 * * *'
+    # Corre todos os dias às 10:55 UTC
+    - cron: '55 10 * * *'
+    # Corre todos os dias às 11:10 UTC
+    - cron: '10 11 * * *'
+    # Executa de Seg a Sex às 17:00 UTC
+    - cron: '00 17 * * 1-5'
+    # Executa de Seg a Sex às 17:15 UTC
+    - cron: '15 17 * * 1-5'
+    # Executa de Seg a Sex às 17:30 UTC
+    - cron: '30 17 * * 1-5'
+    
   workflow_dispatch:           # Permite execução manual
 
 jobs:
