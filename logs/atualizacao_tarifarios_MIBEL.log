@@ -17015,3 +17015,98 @@ Duração total: 23 segundos.
    Data_Valores_OMIP = 2025-11-07
 === Execução terminada em 2025-11-07 18:33:47 ===
 Duração total: 23 segundos.
+=== Execução Python iniciada em 2025-11-07 18:42:05 ===
+/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/openpyxl/styles/stylesheet.py:241: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/openpyxl/styles/stylesheet.py:241: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+✅ Bibliotecas carregadas
+ℹ️ Data de início da atualização definida para: 2025-10-01
+
+⏳ Passo 1: A extrair dados de futuros do ficheiro OMIPdaily.xlsx...
+   - Data do relatório extraída: 2025-11-07
+✅ Dados de futuros extraídos e processados.
+   - Total: 36 futuros
+   - Dias: 9
+   - Semanas: 4
+   - Meses: 6
+
+   📋 Amostra de futuros extraídos:
+
+   Dia:
+      FPB D Sa08Nov-25               -> 2025-11-08 (Saturday) = 44.73 €/MWh
+      FPB D Su09Nov-25               -> 2025-11-09 (Sunday) = 48.89 €/MWh
+      FPB D Mo10Nov-25               -> 2025-11-10 (Monday) = 47.33 €/MWh
+
+   Semana:
+      FPB Wk46-25                    -> 2025-11-10 (Monday) = 45.75 €/MWh
+      FPB Wk47-25                    -> 2025-11-17 (Monday) = 59.50 €/MWh
+      FPB Wk48-25                    -> 2025-11-24 (Monday) = 70.00 €/MWh
+
+   Mês:
+      FPB M Dec-25                   -> 2025-12-01 (Monday) = 67.00 €/MWh
+      FPB M Jan-26                   -> 2026-01-01 (Thursday) = 74.36 €/MWh
+      FPB M Feb-26                   -> 2026-02-01 (Sunday) = 71.91 €/MWh
+
+⏳ Passo 2: A ler e combinar dados OMIE (todos quarto-horários)...
+   - 2a: A ler 'MIBEL.xlsx'...
+   - 2b: A ler dados recentes (ACUM)...
+   - 2c: A ler dados do dia seguinte (INDICADORES)...
+   - 2d: A combinar fontes de dados...
+✅ Todas as fontes de dados OMIE foram combinadas.
+
+⏳ Passo 3: A criar calendário e aplicar futuros (lógica do R)...
+   - A preparar futuros diários...
+   - A preparar futuros semanais...
+   - A preparar futuros mensais...
+   - A preparar futuros trimestrais...
+   - A fazer merge dos futuros...
+   - A propagar futuros dentro dos períodos (fill)...
+   - A juntar dados históricos reais...
+   - A aplicar hierarquia de preços...
+✅ Preços diários (reais e projetados) calculados.
+   - A criar grelha quarto-horária...
+✅ Estrutura ES criada com número correto de quartos-horários.
+
+   🔍 Verificação da aplicação de futuros:
+      2025-10-08 (Wednesday):
+         Real: 98.29468750000001
+         Dia:  nan
+         Sem:  45.75
+         Mês:  67.0
+         ➡️  FINAL: 98.29 €/MWh
+      2025-10-09 (Thursday):
+         Real: 70.288125
+         Dia:  nan
+         Sem:  45.75
+         Mês:  67.0
+         ➡️  FINAL: 70.29 €/MWh
+      2025-10-10 (Friday):
+         Real: 79.21989583333333
+         Dia:  nan
+         Sem:  45.75
+         Mês:  67.0
+         ➡️  FINAL: 79.22 €/MWh
+      2025-10-13 (Monday):
+         Real: 102.65708333333333
+         Dia:  nan
+         Sem:  45.75
+         Mês:  67.0
+         ➡️  FINAL: 102.66 €/MWh
+      2025-11-01 (Saturday):
+         Real: 45.580104166666665
+         Dia:  nan
+         Sem:  45.75
+         Mês:  67.0
+         ➡️  FINAL: 45.58 €/MWh
+
+⏳ Passo 4: A converter para hora de Portugal...
+✅ 35132 registos finais preparados em hora de Portugal.
+✅ Todos os dias têm número de quartos esperado (92, 96 ou 100).
+
+⏳ Passo 5: A atualizar o ficheiro 'Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx'...
+✅ O ficheiro Excel foi atualizado com sucesso!
+   Data_Valores_OMIE = 2025-11-08
+   Data_Valores_OMIP = 2025-11-07
+=== Execução terminada em 2025-11-07 18:42:29 ===
+Duração total: 24 segundos.
