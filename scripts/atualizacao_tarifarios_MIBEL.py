@@ -12,7 +12,7 @@ print("✅ Bibliotecas carregadas")
 # ===================================================================
 # ---- CONFIGURAÇÕES ----
 # ===================================================================
-DATA_INICIO_ATUALIZACAO = pd.to_datetime("2025-10-01")
+DATA_INICIO_ATUALIZACAO = pd.to_datetime("2025-11-15")
 FICHEIRO_EXCEL = "Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx"
 ABA_EXCEL = "OMIE_PERDAS_CICLOS"
 COLUNA_PARA_ESCREVER = 11 # Coluna K
