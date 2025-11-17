@@ -1,0 +1,126 @@
+# Nome descritivo do workflow
+name: Atualizar MIBEL em Tarifários (Fase 1 e 2)
+
+on:
+  schedule:
+    # === GRUPO 1: Manhã (Todos os dias) ===
+    # Horário VERÃO (WEST=UTC+1) -> 11:40, 11:55, 12:10 (Local)
+    #- cron: '40 10 * * *'
+    #- cron: '55 10 * * *'
+    #- cron: '10 11 * * *'
+    # Horário INVERNO (WET=UTC+0) -> 11:40, 11:55, 12:10 (Local)
+    - cron: '40 11 * * *'
+    - cron: '55 11 * * *'
+    - cron: '10 12 * * *'
+
+    # === GRUPO 2: Tarde (Seg-Sex) ===
+    # Horário VERÃO (WEST=UTC+1) -> 18:00, 18:15, 18:30 (Local)
+    #- cron: '00 17 * * 1-5'
+    #- cron: '15 17 * * 1-5'
+    #- cron: '30 17 * * 1-5'
+    # Horário INVERNO (WET=UTC+0) -> 18:00, 18:15, 18:30 (Local)
+    - cron: '00 18 * * 1-5'
+    - cron: '15 18 * * 1-5'
+    - cron: '30 18 * * 1-5'
+
+  workflow_dispatch: # Permite execução manual
+
+jobs:
+  run-python-job:
+    name: Executar Atualização MIBEL em Tarifários
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Necessário para fazer commit das alterações
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # --- CONFIGURAÇÃO DO AMBIENTE PYTHON ---
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # --- CACHE E INSTALAÇÃO DE DEPENDÊNCIAS PYTHON ---
+      - name: Cache das dependências Python
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          # Existe um requirements_atualizar_MIBEL_tarifarios.txt com pandas, numpy, requests, openpyxl
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_atualizar_MIBEL_tarifarios.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_atualizar_MIBEL_tarifarios.txt
+
+      # =========================================================
+      # 4. EXECUTAR FASE 1 (Com Logging)
+      # =========================================================
+      - name: Executar Fase 1 (atualizar_mibel_ano_atual_ACUM.py)
+        run: |
+          mkdir -p logs
+          echo "=== FASE 1 (MIBEL CSV) INICIADA: $(date) ===" >> logs/tarifarios_atualizacao.log
+          python scripts/atualizar_mibel_ano_atual_ACUM.py >> logs/tarifarios_atualizacao.log 2>&1
+          echo "=== FASE 1 (MIBEL CSV) TERMINADA: $(date) ===" >> logs/tarifarios_atualizacao.log
+
+      # =========================================================
+      # 5. COMMIT FASE 1 (A Fonte de Dados)
+      # =========================================================
+      - name: Fazer commit do MIBEL_ano_atual_ACUM.csv
+        id: commit_fase1 # ID CRÍTICO para os passos seguintes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "BOT: Atualização (Fase 1) MIBEL_ano_atual_ACUM.csv"
+          file_pattern: "data/MIBEL_ano_atual_ACUM.csv"
+
+      # =========================================================
+      # 6. EXECUTAR FASE 2 (CONDICIONAL e Com Logging)
+      # =========================================================
+      - name: Executar Fase 2 (atualizar_MIBEL_tarifarios.py)
+        # SÓ CORRE SE O PASSO 'commit_fase1' DETETOU MUDANÇAS
+        if: steps.commit_fase1.outputs.changes_detected == 'true'
+        run: |
+          echo "=== FASE 2 (TARIFÁRIOS) INICIADA (Houve Mudanças): $(date) ===" >> logs/tarifarios_atualizacao.log
+          python scripts/atualizar_MIBEL_tarifarios.py >> logs/tarifarios_atualizacao.log 2>&1
+          echo "=== FASE 2 (TARIFÁRIOS) TERMINADA: $(date) ===" >> logs/tarifarios_atualizacao.log
+      
+      - name: Registar que a Fase 2 foi ignorada
+        # SÓ CORRE SE O PASSO 'commit_fase1' NÃO DETETOU MUDANÇAS
+        if: steps.commit_fase1.outputs.changes_detected == 'false'
+        run: |
+          echo "=== FASE 2 (TARIFÁRIOS) IGNORADA (Sem Mudanças na Fase 1): $(date) ===" >> logs/tarifarios_atualizacao.log
+
+      # =========================================================
+      # 7. COMMIT FASE 2 (Ficheiro Excel e Log)
+      # =========================================================
+      - name: Fazer commit dos ficheiros da Fase 2 (Excel e Log)
+        # SÓ CORRE SE A FASE 1 DETETOU MUDANÇAS
+        if: steps.commit_fase1.outputs.changes_detected == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🔌 BOT: Atualização MIBEL em Tarifarios e Log"
+          file_pattern: "Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx logs/tarifarios_atualizacao.log"
+
+      # =========================================================
+      # 8. COMMIT SÓ DO LOG (Se nada mais mudou)
+      # =========================================================
+      - name: Fazer commit apenas do Log (se a Fase 2 foi ignorada)
+        if: steps.commit_fase1.outputs.changes_detected == 'false'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "BOT: Log de verificação (sem alterações de dados)"
+          file_pattern: "logs/tarifarios_atualizacao.log"
+
+      # =========================================================
+      # 9. UPLOAD DO ARTEFACTO
+      # =========================================================
+      - name: Fazer upload do log como artefacto
+        if: always() # Corre sempre
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-atualizacao-tarifarios
+          path: logs/tarifarios_atualizacao.log
