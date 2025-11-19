@@ -18,9 +18,10 @@ from calendar import monthrange
 
 st.set_page_config(page_title="Simulador de Tarifários Eletricidade 2025: Poupe na Fatura | Tiago Felícia", page_icon="🔌", layout="wide",initial_sidebar_state="collapsed")
 
-# --- Carregar ficheiro Excel do GitHub ---
+# --- Carregar ficheiro Excel do Hugging Face ---
 
-url_excel = "https://github.com/tiagofelicia/simulador-tarifarios-eletricidade/raw/refs/heads/main/Tarifarios_%F0%9F%94%8C_Eletricidade_Tiago_Felicia.xlsx"
+url_excel = "https://huggingface.co/spaces/tiagofelicia/simulador-tarifarios-eletricidade/resolve/main/Tarifarios_%F0%9F%94%8C_Eletricidade_Tiago_Felicia.xlsx"
+
 tarifarios_fixos, tarifarios_indexados, OMIE_PERDAS_CICLOS, CONSTANTES = proc_dados.carregar_dados_excel_elec(url_excel)
 
 potencias_validas = [1.15, 2.3, 3.45, 4.6, 5.75, 6.9, 10.35, 13.8, 17.25, 20.7, 27.6, 34.5, 41.4]
@@ -933,7 +934,7 @@ resultados_list = []
 col_logo, col_titulo = st.columns([1, 5])
 
 with col_logo:
-    st.image("https://raw.githubusercontent.com/tiagofelicia/simulador-tarifarios-eletricidade/refs/heads/main/Logo_Tiago_Felicia.png", width=180)
+    st.image("https://huggingface.co/spaces/tiagofelicia/simulador-tarifarios-eletricidade/resolve/main/Logo_Tiago_Felicia.png", width=180)
 
 with col_titulo:
     st.title("🔌 Tiago Felícia - Simulador de Tarifários de Eletricidade")
