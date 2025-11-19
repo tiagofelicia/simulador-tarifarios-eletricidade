@@ -124,3 +124,20 @@ jobs:
         with:
           name: log-atualizacao-tarifarios
           path: logs/tarifarios_atualizacao.log
+          
+      # =========================================================
+      # 10. PUSH AUTOMÁTICO PARA HUGGING FACE SPACE
+      # =========================================================
+      - name: Push do Excel para Hugging Face Space
+        if: steps.commit_fase1.outputs.changes_detected == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git remote add hf https://$HF_TOKEN@huggingface.co/spaces/tiagofelicia/simulador-tarifarios-eletricidade
+          git fetch hf
+          git checkout main
+          git add Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx
+          git commit -m "BOT: Atualização automática OMIE para Hugging Face Space" || echo "Sem alterações"
+          git push hf main
