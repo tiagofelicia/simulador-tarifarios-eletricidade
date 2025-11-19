@@ -126,7 +126,7 @@ jobs:
           path: logs/tarifarios_atualizacao.log
           
       # =========================================================
-      # 10. 🚀 ENVIAR PARA O HUGGING FACE (Deploy - Versão Clonar & Copiar)
+      # 10. 🚀 ENVIAR PARA O HUGGING FACE (Deploy - Versão Robusta)
       # =========================================================
       - name: Enviar ficheiro para o Hugging Face
         # SÓ CORRE SE O EXCEL FOI ATUALIZADO NA FASE 2
@@ -144,20 +144,22 @@ jobs:
           sudo apt-get install git-lfs
           git lfs install
 
-          # 2. Clonar o repositório do Hugging Face numa pasta separada
+          # 2. Clonar o repositório do Hugging Face para uma pasta separada
           git clone --depth 1 https://user:$HF_TOKEN@huggingface.co/spaces/$REPO_HF hf_repo
 
           # 3. Copiar o ficheiro Excel ATUALIZADO (que está na pasta do GitHub)
           cp -f "$FICHEIRO_EXCEL" hf_repo/
 
-          # 4. Entrar na pasta do Hugging Face e fazer o commit
+          # 4. Entrar na pasta do Hugging Face e configurar/commitar
           cd hf_repo
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Adicionar o ficheiro para o commit
+          # Garantir o rastreio LFS e adicionar o ficheiro
+          git lfs track "*.xlsx"
+          git add .gitattributes
           git add "$FICHEIRO_EXCEL"
           
           # Commit e Push (o || echo evita que falhe se não houver diferença no Excel)
-          git commit -m "🔌 HF: Atualização automática do Excel via GitHub Actions" || echo "Sem alterações no Excel para o Hugging Face"
+          git commit -m "🔌 HF: Atualização automática do Excel via GitHub Actions" || echo "Sem alterações para enviar"
           git push
