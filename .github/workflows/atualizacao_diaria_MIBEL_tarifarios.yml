@@ -161,5 +161,5 @@ jobs:
           git add "$FICHEIRO_EXCEL"
           
           # Commit e Push (o || echo evita que falhe se não houver diferença no Excel)
-          git commit -m "🔌 HF: Atualização automática do Excel via GitHub Actions" || echo "Sem alterações para enviar"
+          git commit -m "🔌 HF: Atualização automática do Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx via GitHub Actions" || echo "Sem alterações para enviar"
           git push
