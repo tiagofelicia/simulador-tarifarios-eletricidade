@@ -824,3 +824,24 @@
    - 🏁 FIM
 === FASE 1 (MIBEL CSV) TERMINADA: Thu Nov 20 18:44:55 UTC 2025 ===
 === FASE 2 (TARIFÁRIOS) IGNORADA (Sem Mudanças na Fase 1): Thu Nov 20 18:44:55 UTC 2025 ===
+=== FASE 1 (MIBEL CSV) INICIADA: Thu Nov 20 18:50:54 UTC 2025 ===
+
+🔵 🚀 A iniciar atualização MIBEL
+
+🔵 [LIVE] A extrair dados ACUM + INDICADORES
+       • [ACUM] A descarregar…
+       • [ACUM] OK (35137 registos)
+       • [ACUM] Intervalo temporal: 2024-11-20 → 2025-11-21
+       • [INDICADORES] A descarregar…
+       • [INDICADORES] OK, dia 2025-11-21 (96 registos)
+
+🔵 [PLANO A] ACUM válido — usar como base
+   - Última data na base: 2025-11-21
+   - INDICADORES disponível para: 2025-11-21
+
+🔵 [FINAL] A combinar e guardar
+   - 💾 Backup criado.
+   - ✅ Atualização concluída: 35137 registos
+   - 🏁 FIM
+=== FASE 1 (MIBEL CSV) TERMINADA: Thu Nov 20 18:50:56 UTC 2025 ===
+=== FASE 2 (TARIFÁRIOS) IGNORADA (Sem Mudanças na Fase 1): Thu Nov 20 18:50:56 UTC 2025 ===
