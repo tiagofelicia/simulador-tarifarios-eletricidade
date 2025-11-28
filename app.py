@@ -1024,7 +1024,7 @@ with st.expander("❔ Perguntas Frequentes (FAQ)", expanded=False):
     ---
     
     ### Dados e Períodos
-    **P: Porque é que a simulação só está disponível a partir de 01/10/2024?**
+    **P: Porque é que a simulação só está disponível a partir de 01/12/2024?**
     
     **R:** A simulação está focada no ano de 2025 para garantir que os cálculos utilizam as Tarifas de Acesso às Redes (TAR) e outras taxas e impostos que estão em vigor. Utilizar dados de consumo de anos anteriores com as tarifas atuais poderia levar a resultados imprecisos, uma vez que as condições do mercado e a regulação mudam anualmente. O simulador ignora automaticamente quaisquer dados anteriores a esta data para garantir a relevância dos resultados.
                 
@@ -1519,21 +1519,21 @@ else:
     data_fim_anterior = st.session_state.get('data_fim_val')
 
     # Definir a data mínima permitida
-    data_minima_permitida = datetime.date(2024, 10, 1)
+    data_minima_permitida = datetime.date(2024, 12, 1)
     # Definir a data máxima permitida
-    data_maxima_permitida = datetime.date(2025, 12, 31)
+    data_maxima_permitida = datetime.date(2026, 12, 31)
 
     with col_data_i:
-        data_inicio = st.date_input("Data Inicial", value=st.session_state.data_inicio_val, min_value=data_minima_permitida, max_value=data_maxima_permitida, format="DD/MM/YYYY", key="data_inicio_key_input", help="A partir de 01/10/2024. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte ao atual.")
+        data_inicio = st.date_input("Data Inicial", value=st.session_state.data_inicio_val, min_value=data_minima_permitida, max_value=data_maxima_permitida, format="DD/MM/YYYY", key="data_inicio_key_input", help="A partir de 01/12/2024. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte ao atual.")
     # Adicionar uma verificação para garantir que a data inicial não é anterior à mínima
     if data_inicio < data_minima_permitida:
-        st.error(f"A Data Inicial selecionada ({data_inicio.strftime('%d/%m/%Y')}) é anterior ao limite de 01/10/2024. Por favor, escolha uma data válida.")
+        st.error(f"A Data Inicial selecionada ({data_inicio.strftime('%d/%m/%Y')}) é anterior ao limite de 01/12/2024. Por favor, escolha uma data válida.")
         # Pode optar por parar a execução ou reverter para a data mínima
         data_inicio = data_minima_permitida
         st.session_state.data_inicio_val = data_minima_permitida
         st.rerun()
     with col_data_f:
-        data_fim = st.date_input("Data Final", value=st.session_state.data_fim_val, min_value=data_minima_permitida, max_value=data_maxima_permitida, format="DD/MM/YYYY", key="data_fim_key_input", help="De Data Inicial a 31/12/2025. Se não modificar as datas ou o mês, será calculado até um mês após a data inicial.")
+        data_fim = st.date_input("Data Final", value=st.session_state.data_fim_val, min_value=data_minima_permitida, max_value=data_maxima_permitida, format="DD/MM/YYYY", key="data_fim_key_input", help="De Data Inicial a 31/12/2026. Se não modificar as datas ou o mês, será calculado até um mês após a data inicial.")
 
     if data_inicio_anterior != data_inicio or data_fim_anterior != data_fim:
         if 'dias_manual_val' in st.session_state: del st.session_state['dias_manual_val']
