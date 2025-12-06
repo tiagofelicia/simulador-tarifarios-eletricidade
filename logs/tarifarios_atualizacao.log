@@ -3586,3 +3586,29 @@
    Data_Valores_OMIE = 2025-12-07
    Data_Valores_OMIP = 2025-12-05
 === FASE 2 (TARIFÁRIOS) TERMINADA: Sat Dec  6 12:23:44 UTC 2025 ===
+=== FASE 1 (MIBEL CSV) INICIADA: Sat Dec  6 12:54:49 UTC 2025 ===
+
+🔵 🚀 A iniciar atualização MIBEL
+
+🔵 [LIVE] A extrair dados ACUM + INDICADORES
+       • [ACUM] A descarregar…
+       • [ACUM] OK (35137 registos)
+       • [ACUM] Intervalo temporal: 2024-12-05 → 2025-12-06
+       • [INDICADORES] A descarregar…
+       • [INDICADORES] OK, dia 2025-12-07 (96 registos)
+
+🔵 [HISTÓRICO] A carregar histórico local
+   - ✔️ CSV carregado (35233 registos)
+
+🔵 [PLANO A] ACUM válido — usar como base principal
+   - Última data na base consolidada: 2025-12-07
+   - INDICADORES disponível para: 2025-12-07
+   - ℹ️ O dia dos INDICADORES (2025-12-07) já existe na base. Ignorado.
+
+🔵 [FINAL] A combinar e guardar
+   - ℹ️ Backup ignorado (GitHub Actions)
+   - ✅ Atualização concluída: 35233 registos
+   -    📅 Dados de: 2024-12-05 até 2025-12-07
+   - 🏁 FIM
+=== FASE 1 (MIBEL CSV) TERMINADA: Sat Dec  6 12:54:51 UTC 2025 ===
+=== FASE 2 (TARIFÁRIOS) IGNORADA (Sem Mudanças na Fase 1): Sat Dec  6 12:54:51 UTC 2025 ===
