@@ -4676,3 +4676,69 @@
    Data_Valores_OMIE = 2025-12-14
    Data_Valores_OMIP = 2025-12-12
 === FASE 2 (TARIFÁRIOS) TERMINADA: Sat Dec 13 12:24:18 UTC 2025 ===
+=== FASE 1 (MIBEL CSV) INICIADA: Sat Dec 13 12:55:46 UTC 2025 ===
+
+🔵 🚀 A iniciar atualização MIBEL
+
+🔵 [LIVE] A extrair dados ACUM + INDICADORES
+       • [ACUM] A descarregar…
+       • [ACUM] OK (35137 registos)
+       • [ACUM] Intervalo temporal: 2024-12-12 → 2025-12-13
+       • [INDICADORES] A descarregar…
+       • [INDICADORES] OK, dia 2025-12-14 (96 registos)
+
+🔵 [HISTÓRICO] A carregar histórico local
+   - ✔️ CSV carregado (35233 registos)
+
+🔵 [PLANO A] ACUM válido — usar como base principal
+   - ⚠️ A recuperar 96 registos do local (gap entre ACUM e Hoje)...
+   -    Dias recuperados: [datetime.date(2025, 12, 14)]
+   - Última data na base consolidada: 2025-12-14
+   - INDICADORES disponível para: 2025-12-14
+   - ✅ O dia dos INDICADORES (2025-12-14) já foi integrado via Download Live.
+
+🔵 [FINAL] A combinar e guardar
+   - ℹ️ Backup ignorado (GitHub Actions)
+   - ✅ Atualização concluída: 35233 registos
+   -    📅 Dados de: 2024-12-12 até 2025-12-14
+   - 🏁 FIM
+=== FASE 1 (MIBEL CSV) TERMINADA: Sat Dec 13 12:55:48 UTC 2025 ===
+=== FASE 2 (TARIFÁRIOS) INICIADA: Sat Dec 13 12:55:48 UTC 2025 ===
+/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/openpyxl/styles/stylesheet.py:241: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/openpyxl/styles/stylesheet.py:241: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+✅ Bibliotecas carregadas
+ℹ️ Fonte de dados: 'data/MIBEL_ano_atual_ACUM.csv'
+⚠️ Dados OMIE e futuros
+
+⏳ Passo 1: A extrair dados de futuros do ficheiro OMIPdaily.xlsx...
+   - Data do relatório OMIP extraída: 2025-12-12
+✅ Dados de futuros extraídos e processados.
+
+⏳ Passo 2: A ler dados históricos do 'data/MIBEL_ano_atual_ACUM.csv'...
+✅ 35233 registos históricos lidos com sucesso.
+
+⏳ Passo 3: A criar calendário e aplicar futuros...
+   - A preparar futuros (diários, semanais, mensais, trimestrais)...
+   - A fazer merge dos futuros...
+   - A propagar futuros dentro dos períodos (fill)...
+   - A juntar dados históricos reais...
+   - A aplicar hierarquia de preços...
+✅ Preços diários (reais e projetados) calculados.
+   - A criar grelha quarto-horária futura...
+✅ Estrutura ES criada com número correto de quartos-horários.
+
+⏳ Passo 4: A converter para hora de Portugal...
+✅ 70172 registos finais (em PT) preparados.
+
+⏳ Passo 5: A preparar dados para o ficheiro 'Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx'...
+   - A ler a pauta de tempo da aba 'OMIE_PERDAS_CICLOS' para alinhamento...
+   - A alinhar preços calculados com a pauta do Excel...
+   - 70080 preços (2025/2026) alinhados e prontos a escrever.
+   - A carregar 'Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx' para escrita...
+   - A escrever 70080 preços na Coluna 11 (K)...
+✅ O ficheiro Excel foi atualizado com sucesso!
+   Data_Valores_OMIE = 2025-12-14
+   Data_Valores_OMIP = 2025-12-12
+=== FASE 2 (TARIFÁRIOS) TERMINADA: Sat Dec 13 12:56:35 UTC 2025 ===
