@@ -484,7 +484,7 @@ def calcular_custo_completo_diagrama_carga(tarifario_idx, df_consumos_reais, df_
         desconto_total_final = 0.0
         acrescimo_total_final = 0.0
 
-        # --- Lógica de Desconto com Limite Temporal (Diagrama) ---
+        # --- Lógica de Desconto Fatura (Com Limite e "s/ desc." visível) ---
         desconto_fatura_mensal = float(tarifario_idx.get('desconto_fatura_mes', 0.0) or 0.0)
         limite_meses_promo = float(tarifario_idx.get('desconto_meses_limite', 0.0) or 0.0)
 
@@ -493,22 +493,25 @@ def calcular_custo_completo_diagrama_carga(tarifario_idx, df_consumos_reais, df_
             limite_dias_promo = limite_meses_promo * 30.0
             
             # 2. Definir quantos dias efetivos recebem desconto
+            dias_efetivos = dias
+            txt_limite = ""
             if limite_meses_promo > 0:
                 dias_efetivos = min(dias, limite_dias_promo)
-                texto_extra = f" nos 1ºs {int(limite_meses_promo)} meses"
-            else:
-                dias_efetivos = dias
-                texto_extra = ""
+                txt_limite = f" nos 1ºs {int(limite_meses_promo)} meses"
 
-            # 3. Calcular Valor a Abater
+            # 3. Calcular Valor do Desconto
             if is_billing_month and (limite_meses_promo == 0 or limite_meses_promo >= 1):
                 desconto_aplicado = desconto_fatura_mensal
             else:
                 desconto_aplicado = (desconto_fatura_mensal / 30.0) * dias_efetivos
 
+            # Capturar o custo ANTES de descontar (para exibir "s/ desc.")
+            custo_sem_desconto_visual = custo_final_com_descontos
+
             custo_final_com_descontos -= desconto_aplicado
             desconto_total_final += desconto_aplicado
-            nome_a_exibir += f" (INCLUI desc. {desconto_fatura_mensal:.2f}€/mês{texto_extra})"
+            
+            nome_a_exibir += f" (INCLUI desc. {desconto_fatura_mensal:.2f}€/mês{txt_limite}, s/ desc.={custo_sem_desconto_visual:.2f}€)"
 
         if incluir_quota_acp and nome_tarifario.startswith("Goldenergy - ACP"):
             quota_aplicada = VALOR_QUOTA_ACP_MENSAL if is_billing_month else (VALOR_QUOTA_ACP_MENSAL / 30.0) * dias
@@ -844,7 +847,7 @@ def calcular_detalhes_custo_tarifario_fixo(
             decomposicao_taxas_tf['custo_com_iva']
         )
 
-        # Desconto de fatura do Excel (Com Limite Temporal)
+        # --- Desconto de fatura (FIXO) com visual "s/ desc." ---
         desconto_fatura_mensal_excel = float(dados_tarifario_linha.get('desconto_fatura_mes', 0.0) or 0.0)
         limite_meses_promo_excel = float(dados_tarifario_linha.get('desconto_meses_limite', 0.0) or 0.0)
         
@@ -853,17 +856,22 @@ def calcular_detalhes_custo_tarifario_fixo(
         if desconto_fatura_mensal_excel > 0:
             limite_dias_promo = limite_meses_promo_excel * 30.0
             
+            dias_efetivos = dias_calculo
+            txt_limite = ""
             if limite_meses_promo_excel > 0:
                 dias_efetivos = min(dias_calculo, limite_dias_promo)
-                nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_excel:.2f}€/mês nos 1ºs {int(limite_meses_promo_excel)} meses)"
-            else:
-                dias_efetivos = dias_calculo
-                nome_a_exibir_final += f" (INCLUI desc. fat. {desconto_fatura_mensal_excel:.2f}€/mês)"
+                txt_limite = f" nos 1ºs {int(limite_meses_promo_excel)} meses"
 
             if e_mes_completo_selecionado_calc and (limite_meses_promo_excel == 0 or limite_meses_promo_excel >= 1):
                 desconto_fatura_periodo_aplicado = desconto_fatura_mensal_excel
             else:
                 desconto_fatura_periodo_aplicado = (desconto_fatura_mensal_excel / 30.0) * dias_efetivos
+            
+            # --- ATUALIZAÇÃO VISUAL: Mostrar custo ANTES do desconto ---
+            # 'custo_total_antes_desc_fatura_tf' é a variável que tem o total antes disto
+            custo_sem_desconto_visual = custo_total_antes_desc_fatura_tf
+            
+            nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_excel:.2f}€/mês{txt_limite}, s/ desc.={custo_sem_desconto_visual:.2f}€)"
         
         custo_apos_desc_fatura_excel = custo_total_antes_desc_fatura_tf - desconto_fatura_periodo_aplicado
         
@@ -1364,6 +1372,7 @@ def calcular_detalhes_custo_tarifario_indexado(
             decomposicao_taxas_idx_calc['custo_com_iva']
         )
 
+        # --- Desconto de fatura (INDEXADO) com visual "s/ desc." ---
         desconto_fatura_mensal_idx_excel = float(dados_tarifario_indexado_linha.get('desconto_fatura_mes', 0.0) or 0.0)
         limite_meses_promo_idx = float(dados_tarifario_indexado_linha.get('desconto_meses_limite', 0.0) or 0.0)
         
@@ -1372,17 +1381,22 @@ def calcular_detalhes_custo_tarifario_indexado(
         if desconto_fatura_mensal_idx_excel > 0:
             limite_dias_promo = limite_meses_promo_idx * 30.0
             
+            dias_efetivos = dias_calculo
+            txt_limite = ""
             if limite_meses_promo_idx > 0:
                 dias_efetivos = min(dias_calculo, limite_dias_promo)
-                nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_idx_excel:.2f}€/mês nos 1ºs {int(limite_meses_promo_idx)} meses)"
-            else:
-                dias_efetivos = dias_calculo
-                nome_a_exibir_final += f" (INCLUI desc. fat. {desconto_fatura_mensal_idx_excel:.2f}€/mês)"
+                txt_limite = f" nos 1ºs {int(limite_meses_promo_idx)} meses"
 
             if is_billing_month and (limite_meses_promo_idx == 0 or limite_meses_promo_idx >= 1):
                 desconto_fatura_periodo_aplicado_idx = desconto_fatura_mensal_idx_excel
             else:
                 desconto_fatura_periodo_aplicado_idx = (desconto_fatura_mensal_idx_excel / 30.0) * dias_efetivos
+
+            # --- ATUALIZAÇÃO VISUAL ---
+            # 'custo_total_antes_desc_fatura_idx_calc' é a variável correta aqui
+            custo_sem_desconto_visual = custo_total_antes_desc_fatura_idx_calc
+            
+            nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_idx_excel:.2f}€/mês{txt_limite}, s/ desc.={custo_sem_desconto_visual:.2f}€)"
 
         custo_total_final_calculado_idx = custo_total_antes_desc_fatura_idx_calc - desconto_fatura_periodo_aplicado_idx
 
@@ -2335,7 +2349,7 @@ def calcular_custo_gas_completo(
 
         custo_subtotal_c_iva = total_base_iva_reduzido + total_base_iva_normal + iva_total_periodo
 
-        # --- 9. LÓGICA DE DESCONTOS FINAIS (Com Limite Temporal) ---
+        # --- 9. LÓGICA DE DESCONTOS FINAIS (Com "s/ desc." visível) ---
         
         is_billing_month = 28 <= dias_periodo <= 31
         desconto_total_final_eur = 0.0
@@ -2349,21 +2363,25 @@ def calcular_custo_gas_completo(
             limite_dias_promo = limite_meses_promo_gas * 30.0
             
             # 2. Definir quantos dias efetivos recebem desconto
+            dias_efetivos = dias_periodo
+            txt_limite = ""
             if limite_meses_promo_gas > 0:
                 dias_efetivos = min(dias_periodo, limite_dias_promo)
-                nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_excel:.2f}€/mês nos 1ºs {int(limite_meses_promo_gas)} meses)" 
-            else:
-                dias_efetivos = dias_periodo
-                nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_excel:.2f}€/mês)" 
-            
-            # 3. Aplicar Valor
-            # Se for mês completo e a promoção cobrir o mês todo (ou for eterna), aplica valor cheio.
+                txt_limite = f" nos 1ºs {int(limite_meses_promo_gas)} meses"
+
+            # 3. Calcular Valor do Desconto
             if is_billing_month and (limite_meses_promo_gas == 0 or limite_meses_promo_gas >= 1):
                  desconto_aplicado = desconto_fatura_mensal_excel
             else:
                  desconto_aplicado = (desconto_fatura_mensal_excel / 30.0) * dias_efetivos
             
             desconto_total_final_eur += desconto_aplicado
+
+            # Mostramos o custo total ANTES deste desconto ser aplicado
+            # Nota: Se houver Quota ACP, ela é somada depois, pelo que este valor é "s/ desc. e s/ ACP" (o que é correto para a maioria)
+            custo_sem_desconto = custo_subtotal_c_iva
+            
+            nome_a_exibir_final += f" (INCLUI desc. {desconto_fatura_mensal_excel:.2f}€/mês{txt_limite}, s/ desc.={custo_sem_desconto:.2f}€)"
         
         if acp_gas_flag and nome_original_tarifario.startswith("Goldenergy - ACP"):
             quota_aplicada = VALOR_QUOTA_ACP_MENSAL_CONST if is_billing_month else (VALOR_QUOTA_ACP_MENSAL_CONST / 30.0) * dias_periodo

@@ -2762,19 +2762,29 @@ if meu_tarifario_ativo:
         if desconto > 0 and acrescimo > 0:
             # Cenário 1: Ambos existem, calcular o valor líquido
             valor_liquido = desconto - acrescimo
+            
             if valor_liquido > 0:
-                sufixo_nome = f" (Inclui desconto líquido de {valor_liquido:.2f}€ no período)"
+                # O desconto é maior que o acréscimo -> Resultado final é um Desconto
+                custo_sem_ajuste = custo_total_meu_tarifario_com_iva + valor_liquido
+                sufixo_nome = f" (Inclui desconto líquido de {valor_liquido:.2f}€ no período, s/ desc.={custo_sem_ajuste:.2f}€)"
+            
             elif valor_liquido < 0:
-                sufixo_nome = f" (Inclui acréscimo líquido de {abs(valor_liquido):.2f}€ no período)"
-            # Se valor_liquido for 0, não adicionamos sufixo pois anulam-se
+                # O acréscimo é maior que o desconto -> Resultado final é um Acréscimo
+                valor_acresc_abs = abs(valor_liquido)
+                custo_sem_ajuste = custo_total_meu_tarifario_com_iva - valor_acresc_abs
+                sufixo_nome = f" (Inclui acréscimo líquido de {valor_acresc_abs:.2f}€ no período, s/ acrésc.={custo_sem_ajuste:.2f}€)"
+            
+            # Se valor_liquido for 0, não adicionamos sufixo
 
         elif desconto > 0:
             # Cenário 2: Apenas desconto existe
-            sufixo_nome = f" (Inclui desconto de {desconto:.2f}€ no período)"
+            custo_sem_ajuste = custo_total_meu_tarifario_com_iva + desconto
+            sufixo_nome = f" (Inclui desconto de {desconto:.2f}€ no período, s/ desc.={custo_sem_ajuste:.2f}€)"
 
         elif acrescimo > 0:
             # Cenário 3: Apenas acréscimo existe
-            sufixo_nome = f" (Inclui acréscimo de {acrescimo:.2f}€ no período)"
+            custo_sem_ajuste = custo_total_meu_tarifario_com_iva - acrescimo
+            sufixo_nome = f" (Inclui acréscimo de {acrescimo:.2f}€ no período, s/ acrésc.={custo_sem_ajuste:.2f}€)"
 
         # Adicionar o sufixo calculado ao nome final
         nome_para_exibir_meu_tarifario += sufixo_nome
@@ -4227,7 +4237,7 @@ if modo_de_comparacao_ativo:
                         for col_idx_iter, col_nome_iter_width in enumerate(df_para_exportar.columns):
                             col_letra_iter = get_column_letter(col_idx_iter + 1) # get_column_letter já deve estar importado
                             if "Tarifário" in col_nome_iter_width :
-                                 worksheet_excel.column_dimensions[col_letra_iter].width = 80    
+                                 worksheet_excel.column_dimensions[col_letra_iter].width = 95    
                             elif "Total Simples (€)" == col_nome_iter_width :
                                 worksheet_excel.column_dimensions[col_letra_iter].width = 33
                             elif "Total Bi-horário - Ciclo Diário (€)" in col_nome_iter_width :
@@ -4560,50 +4570,32 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                 # A lógica 'e_mes_completo_selecionado' é substituída pela nossa variável 'is_billing_month'
                 e_mes_completo_selecionado = is_billing_month
 
-                # --- Aplicar desconto_fatura_mes (COM LIMITE TEMPORAL) ---
-                desconto_fatura_mensal_tf = 0.0
-                limite_meses_promo_tf = 0.0
-
-                # 1. Ler o valor do Desconto (€)
-                if 'desconto_fatura_mes' in tarifario.index and pd.notna(tarifario['desconto_fatura_mes']):
-                    try:
-                        desconto_fatura_mensal_tf = float(tarifario['desconto_fatura_mes'])
-                    except ValueError:
-                        desconto_fatura_mensal_tf = 0.0
-
-                # 2. Ler o Limite Temporal (Meses)
-                if 'desconto_meses_limite' in tarifario.index and pd.notna(tarifario['desconto_meses_limite']):
-                    try:
-                        limite_meses_promo_tf = float(tarifario['desconto_meses_limite'])
-                    except ValueError:
-                        limite_meses_promo_tf = 0.0
+                # --- Aplicar desconto_fatura_mes (Com Limite e "s/ desc." visível) ---
+                desconto_fatura_mensal_tf = float(tarifario.get('desconto_fatura_mes', 0.0) or 0.0)
+                limite_meses_promo_tf = float(tarifario.get('desconto_meses_limite', 0.0) or 0.0)
                 
                 desconto_fatura_periodo_tf = 0.0
 
-                # 3. Calcular
                 if desconto_fatura_mensal_tf > 0:
-                    # Converter limite de meses para dias (base 30)
                     limite_dias_promo = limite_meses_promo_tf * 30.0
                     
-                    # Definir quantos dias efetivos recebem desconto
+                    dias_efetivos = dias
+                    txt_limite = ""
                     if limite_meses_promo_tf > 0:
-                        # O desconto aplica-se ao menor valor entre: dias simulados vs limite da promoção
                         dias_efetivos = min(dias, limite_dias_promo)
-                        nome_a_exibir += f" (INCLUI desc. {desconto_fatura_mensal_tf:.2f}€/mês nos 1ºs {int(limite_meses_promo_tf)} meses)"
-                    else:
-                        # Sem limite (0), aplica-se a tudo
-                        dias_efetivos = dias
-                        nome_a_exibir += f" (INCLUI desconto {desconto_fatura_mensal_tf:.2f}€/mês)"
+                        txt_limite = f" nos 1ºs {int(limite_meses_promo_tf)} meses"
 
-                    # Calcular valor a abater
-                    # Lógica: Se for mês de faturação "completo" E a promoção for válida (ou eterna), dá o valor mensal cheio.
                     if is_billing_month and (limite_meses_promo_tf == 0 or limite_meses_promo_tf >= 1):
                         desconto_fatura_periodo_tf = desconto_fatura_mensal_tf
                     else:
-                        # Caso contrário (simulação parcial ou dias restantes da promoção), faz proporcional
                         desconto_fatura_periodo_tf = (desconto_fatura_mensal_tf / 30.0) * dias_efetivos
+                    
+                    # --- ALTERAÇÃO AQUI: Capturar o custo ANTES de descontar ---
+                    custo_sem_desconto_visual = custo_total_antes_desc_fatura_tf
 
-                # Custo após o desconto de fatura do Excel
+                    nome_a_exibir += f" (INCLUI desc. {desconto_fatura_mensal_tf:.2f}€/mês{txt_limite}, s/ desc.={custo_sem_desconto_visual:.2f}€)"
+
+                # Custo final após desconto
                 custo_apos_desc_fatura_excel_tf = custo_total_antes_desc_fatura_tf - desconto_fatura_periodo_tf
                 # --- FIM desconto_fatura_mes ---
 
@@ -5217,49 +5209,30 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                     # A lógica 'e_mes_completo_selecionado' é substituída pela nossa variável 'is_billing_month'
                     e_mes_completo_selecionado = is_billing_month
 
-                # --- Aplicar desconto_fatura_mes (COM LIMITE TEMPORAL) ---
-                    desconto_fatura_mensal_idx = 0.0
-                    limite_meses_promo_idx = 0.0
-                    nome_tarifario_original_idx = str(nome_tarifario) # Guardar o nome original
-
-                    # 1. Ler o valor do Desconto (€)
-                    if 'desconto_fatura_mes' in tarifario_indexado and pd.notna(tarifario_indexado['desconto_fatura_mes']):
-                        try:
-                            desconto_fatura_mensal_idx = float(tarifario_indexado['desconto_fatura_mes'])
-                        except ValueError:
-                            desconto_fatura_mensal_idx = 0.0
-
-                    # 2. Ler o Limite Temporal (Meses)
-                    if 'desconto_meses_limite' in tarifario_indexado and pd.notna(tarifario_indexado['desconto_meses_limite']):
-                        try:
-                            limite_meses_promo_idx = float(tarifario_indexado['desconto_meses_limite'])
-                        except ValueError:
-                            limite_meses_promo_idx = 0.0
+# --- Aplicar desconto_fatura_mes (Indexados - Com Limite e "s/ desc.") ---
+                    desconto_fatura_mensal_idx = float(tarifario_indexado.get('desconto_fatura_mes', 0.0) or 0.0)
+                    limite_meses_promo_idx = float(tarifario_indexado.get('desconto_meses_limite', 0.0) or 0.0)
                     
                     desconto_fatura_periodo_idx = 0.0
 
-                    # 3. Calcular
                     if desconto_fatura_mensal_idx > 0:
-                        # Converter limite de meses para dias (base 30)
                         limite_dias_promo = limite_meses_promo_idx * 30.0
                         
-                        # Definir quantos dias efetivos recebem desconto
+                        dias_efetivos = dias
+                        txt_limite = ""
                         if limite_meses_promo_idx > 0:
-                            # O desconto aplica-se ao menor valor entre: duração da simulação vs limite da promoção
                             dias_efetivos = min(dias, limite_dias_promo)
-                            nome_tarifario += f" (INCLUI desc. {desconto_fatura_mensal_idx:.2f} €/mês nos 1ºs {int(limite_meses_promo_idx)} meses)"
-                        else:
-                            # Sem limite (0), aplica-se a tudo
-                            dias_efetivos = dias
-                            nome_tarifario += f" (INCLUI desconto {desconto_fatura_mensal_idx:.2f} €/mês)"
+                            txt_limite = f" nos 1ºs {int(limite_meses_promo_idx)} meses"
 
-                        # Calcular valor final a abater
-                        # Se for um mês de faturação "completo" (28-31 dias) E a promoção cobrir pelo menos 1 mês (ou for eterna), dá o valor cheio.
                         if is_billing_month and (limite_meses_promo_idx == 0 or limite_meses_promo_idx >= 1):
                             desconto_fatura_periodo_idx = desconto_fatura_mensal_idx
                         else:
-                            # Caso contrário (simulação parcial ou promoção que acaba a meio), faz proporcional
                             desconto_fatura_periodo_idx = (desconto_fatura_mensal_idx / 30.0) * dias_efetivos
+
+                        # --- ALTERAÇÃO AQUI: Capturar o custo ANTES de descontar ---
+                        custo_sem_desconto_visual = custo_total_antes_desc_fatura_idx
+
+                        nome_tarifario += f" (INCLUI desc. {desconto_fatura_mensal_idx:.2f}€/mês{txt_limite}, s/ desc.={custo_sem_desconto_visual:.2f}€)"
 
                     custo_total_estimado_idx = custo_total_antes_desc_fatura_idx - desconto_fatura_periodo_idx
                     # --- FIM Aplicar desconto_fatura_mes ---
@@ -5855,7 +5828,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
             """)
 
             # --- Configuração Coluna Tarifário com Link e Tooltip ---
-            gb.configure_column(field='NomeParaExibir', headerName='Tarifário', cellRenderer=link_tooltip_renderer_js, minWidth=100, flex=2, filter='agTextColumnFilter', tooltipValueGetter=tooltip_nome_tarifario_getter_js, tooltipComponent=custom_tooltip_component_js,
+            gb.configure_column(field='NomeParaExibir', headerName='Tarifário', cellRenderer=link_tooltip_renderer_js, width=450, minWidth=100, flex=2, filter='agTextColumnFilter', tooltipValueGetter=tooltip_nome_tarifario_getter_js, tooltipComponent=custom_tooltip_component_js,
         cellStyle=cell_style_nome_tarifario_js)
             if 'LinkAdesao' in df_resultados_para_aggrid.columns:
                 gb.configure_column(field='LinkAdesao', hide=True) # Desativar filtro explicitamente
@@ -6956,7 +6929,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                         for col_idx_iter, col_nome_iter_width in enumerate(df_para_exportar.columns):
                             col_letra_iter = get_column_letter(col_idx_iter + 1) # get_column_letter já deve estar importado
                             if "Tarifário" in col_nome_iter_width :
-                                worksheet_excel.column_dimensions[col_letra_iter].width = 80    
+                                worksheet_excel.column_dimensions[col_letra_iter].width = 95    
                             elif "Total (€)" == col_nome_iter_width :
                                 worksheet_excel.column_dimensions[col_letra_iter].width = 25
                             elif "(€/kWh)" in col_nome_iter_width or "(€/dia)" in col_nome_iter_width:
