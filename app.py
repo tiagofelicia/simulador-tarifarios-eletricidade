@@ -16,7 +16,7 @@ from openpyxl.styles import Font, Alignment, Border, Side, PatternFill # Para fo
 from openpyxl.utils import get_column_letter # Para nomes de colunas Excel
 from calendar import monthrange
 
-st.set_page_config(page_title="Simulador de Tarifários Eletricidade 2025: Poupe na Fatura | Tiago Felícia", page_icon="🔌", layout="wide",initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Simulador de Tarifários Eletricidade 2026: Poupe na Fatura | Tiago Felícia", page_icon="🔌", layout="wide",initial_sidebar_state="collapsed")
 
 # --- Carregar ficheiro Excel do Hugging Face ---
 
@@ -937,7 +937,7 @@ with col_logo:
     st.image("https://huggingface.co/spaces/tiagofelicia/simulador-tarifarios-eletricidade/resolve/main/Logo_Tiago_Felicia.png", width=180)
 
 with col_titulo:
-    st.title("🔌 Tiago Felícia - Simulador de Tarifários de Eletricidade")
+    st.title("🔌 Tiago Felícia - Simulador de Tarifários de Eletricidade 2026")
 
 st.button(
     "🧹 Limpar e Reiniciar Simulador",
@@ -1024,9 +1024,9 @@ with st.expander("❔ Perguntas Frequentes (FAQ)", expanded=False):
     ---
     
     ### Dados e Períodos
-    **P: Porque é que a simulação só está disponível a partir de 01/12/2024?**
+    **P: Porque é que a simulação só está disponível a partir de 01/01/2025?**
     
-    **R:** A simulação está focada no ano de 2025 para garantir que os cálculos utilizam as Tarifas de Acesso às Redes (TAR) e outras taxas e impostos que estão em vigor. Utilizar dados de consumo de anos anteriores com as tarifas atuais poderia levar a resultados imprecisos, uma vez que as condições do mercado e a regulação mudam anualmente. O simulador ignora automaticamente quaisquer dados anteriores a esta data para garantir a relevância dos resultados.
+    **R:** A simulação está focada no ano de 2026 para garantir que os cálculos utilizam as Tarifas de Acesso às Redes (TAR) e outras taxas e impostos que estão em vigor. Utilizar dados de consumo de anos anteriores com as tarifas atuais poderia levar a resultados imprecisos, uma vez que as condições do mercado e a regulação mudam anualmente. O simulador ignora automaticamente quaisquer dados anteriores a esta data para garantir a relevância dos resultados.
                 
     **P:  Qual a diferença entre escolher um Mês e um Período de Datas manual?**
     
@@ -1519,12 +1519,12 @@ else:
     data_fim_anterior = st.session_state.get('data_fim_val')
 
     # Definir a data mínima permitida
-    data_minima_permitida = datetime.date(2024, 12, 1)
+    data_minima_permitida = datetime.date(2025, 1, 1)
     # Definir a data máxima permitida
     data_maxima_permitida = datetime.date(2026, 12, 31)
 
     with col_data_i:
-        data_inicio = st.date_input("Data Inicial", value=st.session_state.data_inicio_val, min_value=data_minima_permitida, max_value=data_maxima_permitida, format="DD/MM/YYYY", key="data_inicio_key_input", help="A partir de 01/12/2024. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte ao atual.")
+        data_inicio = st.date_input("Data Inicial", value=st.session_state.data_inicio_val, min_value=data_minima_permitida, max_value=data_maxima_permitida, format="DD/MM/YYYY", key="data_inicio_key_input", help="A partir de 01/01/2025. Se não modificar as datas ou o mês, será calculado a partir do dia seguinte ao atual.")
     # Adicionar uma verificação para garantir que a data inicial não é anterior à mínima
     if data_inicio < data_minima_permitida:
         st.error(f"A Data Inicial selecionada ({data_inicio.strftime('%d/%m/%Y')}) é anterior ao limite de 01/12/2024. Por favor, escolha uma data válida.")
@@ -3217,7 +3217,7 @@ if modo_de_comparacao_ativo:
             // Estilo base aplicado a todas as células desta coluna
             let styleToApply = {{ 
                 textAlign: 'center',
-                borderRadius: '6px',  // O teu borderRadius desejado
+                borderRadius: '11px',  // O teu borderRadius desejado
                 padding: '10px 10px'   // O teu padding desejado
                 // Podes adicionar um backgroundColor default para células não especiais aqui, se quiseres
                 // backgroundColor: '#f0f0f0' // Exemplo para tarifários fixos
@@ -3312,7 +3312,7 @@ if modo_de_comparacao_ativo:
                     this.eGui.style.color = 'black';           // Cor do texto
                     this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
                     this.eGui.style.padding = '10px';           // Mais padding
-                    this.eGui.style.borderRadius = '6px';      // Cantos arredondados
+                    this.eGui.style.borderRadius = '11px';      // Cantos arredondados
                     this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
                     this.eGui.style.maxWidth = '400px';        // Largura máxima
                     this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
@@ -3728,13 +3728,13 @@ if modo_de_comparacao_ativo:
             cell_style_cores_comparativa_js_local = JsCode(f"""
             function(params) {{
                 const minMaxConfig = {min_max_data_comparativa_json_string_local}; 
-                let style = {{ textAlign: 'center', borderRadius: '6px', padding: '10px 10px' }};
+                let style = {{ textAlign: 'center', borderRadius: '11px', padding: '10px 10px' }};
                 if (params.value == null || isNaN(parseFloat(params.value)) || !minMaxConfig[params.colDef.field]) return style;
                 const min_val = minMaxConfig[params.colDef.field].min;
                 const max_val = minMaxConfig[params.colDef.field].max;
                 if (max_val === min_val) {{ style.backgroundColor = 'lightgrey'; return style; }}
                 const normalized_value = Math.max(0, Math.min(1, (parseFloat(params.value) - min_val) / (max_val - min_val)));
-                const cL={{r:99,g:190,b:123}},cM={{r:255,g:255,b:255}},cH={{r:248,g:105,b:107}}; let r,g,b;
+                const cL={{r:90,g:138,b:198}},cM={{r:255,g:255,b:255}},cH={{r:248,g:105,b:107}}; let r,g,b;
                 if(normalized_value < 0.5){{const t=normalized_value/0.5;r=Math.round(cL.r*(1-t)+cM.r*t);g=Math.round(cL.g*(1-t)+cM.g*t);b=Math.round(cL.b*(1-t)+cM.b*t);}}
                 else{{const t=(normalized_value-0.5)/0.5;r=Math.round(cM.r*(1-t)+cH.r*t);g=Math.round(cM.g*(1-t)+cH.g*t);b=Math.round(cM.b*(1-t)+cH.b*t);}}
                 style.backgroundColor=`rgb(${{r}},${{g}},${{b}})`;
@@ -3914,7 +3914,7 @@ if modo_de_comparacao_ativo:
         
                     midpoint = (minimo + maximo) / 2
                     r_bg, g_bg, b_bg = 255,255,255 
-                    verde_rgb, branco_rgb, vermelho_rgb = (99,190,123), (255,255,255), (248,105,107)
+                    verde_rgb, branco_rgb, vermelho_rgb = (90,138,198), (255,255,255), (248,105,107)
 
                     if val_float <= midpoint:
                         ratio = (val_float - minimo) / (midpoint - minimo) if midpoint != minimo else 0.0
@@ -5718,7 +5718,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                 // Estilo base aplicado a todas as células desta coluna
                 let styleToApply = {{ 
                     textAlign: 'center',
-                    borderRadius: '6px',  // O teu borderRadius desejado
+                    borderRadius: '11px',  // O teu borderRadius desejado
                     padding: '10px 10px'   // O teu padding desejado
                     // Podes adicionar um backgroundColor default para células não especiais aqui, se quiseres
                     // backgroundColor: '#f0f0f0' // Exemplo para tarifários fixos
@@ -5813,7 +5813,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                         this.eGui.style.color = 'black';           // Cor do texto
                         this.eGui.style.border = '1px solid #ccc'; // Borda mais suave
                         this.eGui.style.padding = '10px';           // Mais padding
-                        this.eGui.style.borderRadius = '6px';      // Cantos arredondados
+                        this.eGui.style.borderRadius = '11px';      // Cantos arredondados
                         this.eGui.style.boxShadow = '0 2px 5px rgba(0,0,0,0.15)'; // Sombra suave
                         this.eGui.style.maxWidth = '400px';        // Largura máxima
                         this.eGui.style.fontSize = '1.1em';        // Tamanho da fonte
@@ -5859,7 +5859,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
 
                 let style = {{ 
                     textAlign: 'center',
-                    borderRadius: '6px',
+                    borderRadius: '11px',
                     padding: '10px 10px'
                 }};
 
@@ -5877,7 +5877,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
 
                 const normalized_value = Math.max(0, Math.min(1, (value - min_val) / (max_val - min_val)));
                 // Cores alvo do Excel
-                const colorLow = {{ r: 99, g: 190, b: 123 }};  // Verde #63BE7B
+                const colorLow = {{ r: 90, g: 138, b: 198 }};  // Verde #63BE7B
                 const colorMid = {{ r: 255, g: 255, b: 255 }}; // Branco #FFFFFF
                 const colorHigh = {{ r: 248, g: 105, b: 107 }}; // Vermelho #F8696B
 
@@ -6414,7 +6414,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                         filterParams=set_filter_params,
                         cellStyle={
                             'textAlign': 'center', 
-                            'borderRadius': '6px',
+                            'borderRadius': '11px',
                             'padding': '10px 10px',
                             'backgroundColor': '#f0f0f0' 
                         },
@@ -6433,7 +6433,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                     filter='agTextColumnFilter',
                     cellStyle={
                         'textAlign': 'center', 
-                        'borderRadius': '6px', 
+                        'borderRadius': '11px', 
                         'padding': '10px 10px', 
                         'backgroundColor': '#f0f0f0'
                     },
@@ -7043,7 +7043,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                     
                                 midpoint = (minimo + maximo) / 2
                                 r_bg, g_bg, b_bg = 255,255,255 
-                                verde_rgb, branco_rgb, vermelho_rgb = (99,190,123), (255,255,255), (248,105,107)
+                                verde_rgb, branco_rgb, vermelho_rgb = (90,138,198), (255,255,255), (248,105,107)
 
                                 if val_float <= midpoint:
                                     ratio = (val_float - minimo) / (midpoint - minimo) if midpoint != minimo else 0.0
@@ -7959,7 +7959,7 @@ with col_social5:
 st.markdown("<br>", unsafe_allow_html=True) # Adiciona um espaço vertical
 
 # Texto de Copyright
-ano_copyright = 2025
+ano_copyright = 2026
 nome_autor = "Tiago Felícia"
 texto_copyright_html = f"© {ano_copyright} Todos os direitos reservados | {nome_autor}"
 
