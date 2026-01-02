@@ -3734,7 +3734,7 @@ if modo_de_comparacao_ativo:
                 const max_val = minMaxConfig[params.colDef.field].max;
                 if (max_val === min_val) {{ style.backgroundColor = 'lightgrey'; return style; }}
                 const normalized_value = Math.max(0, Math.min(1, (parseFloat(params.value) - min_val) / (max_val - min_val)));
-                const cL={{r:90,g:138,b:198}},cM={{r:255,g:255,b:255}},cH={{r:248,g:105,b:107}}; let r,g,b;
+                const cL={{r:90,g:138,b:198}},cM={{r:255,g:255,b:255}},cH={{r:247,g:150,b:70}}; let r,g,b;
                 if(normalized_value < 0.5){{const t=normalized_value/0.5;r=Math.round(cL.r*(1-t)+cM.r*t);g=Math.round(cL.g*(1-t)+cM.g*t);b=Math.round(cL.b*(1-t)+cM.b*t);}}
                 else{{const t=(normalized_value-0.5)/0.5;r=Math.round(cM.r*(1-t)+cH.r*t);g=Math.round(cM.g*(1-t)+cH.g*t);b=Math.round(cM.b*(1-t)+cH.b*t);}}
                 style.backgroundColor=`rgb(${{r}},${{g}},${{b}})`;
@@ -3914,7 +3914,7 @@ if modo_de_comparacao_ativo:
         
                     midpoint = (minimo + maximo) / 2
                     r_bg, g_bg, b_bg = 255,255,255 
-                    verde_rgb, branco_rgb, vermelho_rgb = (90,138,198), (255,255,255), (248,105,107)
+                    verde_rgb, branco_rgb, vermelho_rgb = (90,138,198), (255,255,255), (247,150,70)
 
                     if val_float <= midpoint:
                         ratio = (val_float - minimo) / (midpoint - minimo) if midpoint != minimo else 0.0
@@ -5879,7 +5879,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                 // Cores alvo do Excel
                 const colorLow = {{ r: 90, g: 138, b: 198 }};  // Verde #63BE7B
                 const colorMid = {{ r: 255, g: 255, b: 255 }}; // Branco #FFFFFF
-                const colorHigh = {{ r: 248, g: 105, b: 107 }}; // Vermelho #F8696B
+                const colorHigh = {{ r: 247, g: 150, b: 70 }}; // Vermelho #F8696B
 
                 let r, g, b;
 
@@ -7043,7 +7043,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                     
                                 midpoint = (minimo + maximo) / 2
                                 r_bg, g_bg, b_bg = 255,255,255 
-                                verde_rgb, branco_rgb, vermelho_rgb = (90,138,198), (255,255,255), (248,105,107)
+                                verde_rgb, branco_rgb, vermelho_rgb = (90,138,198), (255,255,255), (247,150,70)
 
                                 if val_float <= midpoint:
                                     ratio = (val_float - minimo) / (midpoint - minimo) if midpoint != minimo else 0.0
