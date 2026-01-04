@@ -4949,7 +4949,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                                     elif nome_tarifario == "Plenitude - Tendência": calculo_instantaneo_sem_perfil = (((omie + constantes.get('Plenitude_CGS', 0.0) + constantes.get('Plenitude_GDOs', 0.0))) * perdas + constantes.get('Plenitude_Fee', 0.0))
                                     elif nome_tarifario == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil = (omie + constantes.get('Meo_K', 0.0)) * perdas
                                     elif nome_tarifario == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil = (omie * perdas * constantes.get('EDP_H_K1', 1.0) + constantes.get('EDP_H_K2', 0.0))
-                                    elif nome_tarifario == "EZU - Coletiva": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
+                                    elif nome_tarifario == "EZU - Indexada": calculo_instantaneo_sem_perfil = (omie + constantes.get('EZU_K', 0.0) + constantes.get('EZU_CGS', 0.0)) * perdas
                                     elif nome_tarifario == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil = (omie * constantes.get('G9_FA', 0.0) * perdas + constantes.get('G9_CGS', 0.0) + constantes.get('G9_AC', 0.0))
                                     elif nome_tarifario == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil = (omie * perdas + constantes.get("Iberdrola_Dinamico_Q", 0.0) + constantes.get('Iberdrola_mFRR', 0.0))
 

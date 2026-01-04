@@ -408,7 +408,7 @@ def calcular_custo_completo_diagrama_carga(tarifario_idx, df_consumos_reais, df_
             elif "Plenitude - Tendência" in nome_tarifario: return (((omie_kwh + constantes_dict.get('Plenitude_CGS', 0.0) + constantes_dict.get('Plenitude_GDOs', 0.0))) * perdas + constantes_dict.get('Plenitude_Fee', 0.0))
             elif "Meo Energia - Tarifa Variável" in nome_tarifario: return (omie_kwh + constantes_dict.get('Meo_K', 0.0)) * perdas
             elif "EDP - Eletricidade Indexada Horária" in nome_tarifario: return (omie_kwh * perdas * constantes_dict.get('EDP_H_K1', 1.0) + constantes_dict.get('EDP_H_K2', 0.0))
-            elif "EZU - Coletiva" in nome_tarifario: return (omie_kwh + constantes_dict.get('EZU_K', 0.0) + constantes_dict.get('EZU_CGS', 0.0)) * perdas
+            elif "EZU - Indexada" in nome_tarifario: return (omie_kwh + constantes_dict.get('EZU_K', 0.0) + constantes_dict.get('EZU_CGS', 0.0)) * perdas
             elif "G9 - Smart Dynamic" in nome_tarifario: return (omie_kwh * constantes_dict.get('G9_FA', 0.0) * perdas + constantes_dict.get('G9_CGS', 0.0) + constantes_dict.get('G9_AC', 0.0))
             elif "Iberdrola - Simples Indexado Dinâmico" in nome_tarifario: return (omie_kwh * perdas + constantes_dict.get("Iberdrola_Dinamico_Q", 0.0) + constantes_dict.get('Iberdrola_mFRR', 0.0))
             elif "Luzboa - BTN SPOTDEF" in nome_tarifario: return (omie_kwh + constantes_dict.get('Luzboa_CGS', 0.0)) * perdas * constantes_dict.get('Luzboa_FA', 1.0) + constantes_dict.get('Luzboa_Kp', 0.0)
@@ -1127,7 +1127,7 @@ def calcular_detalhes_custo_tarifario_indexado(
                     elif nome_tarifario_original == "Plenitude - Tendência": calculo_instantaneo_sem_perfil_qh = ((omie_val_qh + constantes_dict_local.get('Plenitude_CGS', 0.0) + constantes_dict_local.get('Plenitude_GDOs', 0.0)) * perdas_val_qh + constantes_dict_local.get('Plenitude_Fee', 0.0))
                     elif nome_tarifario_original == "Meo Energia - Tarifa Variável": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Meo_K', 0.0)) * perdas_val_qh
                     elif nome_tarifario_original == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('EDP_H_K1', 1.0) + constantes_dict_local.get('EDP_H_K2', 0.0))
-                    elif nome_tarifario_original == "EZU - Coletiva": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('EZU_K', 0.0) + constantes_dict_local.get('EZU_CGS', 0.0)) * perdas_val_qh
+                    elif nome_tarifario_original == "EZU - Indexada": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('EZU_K', 0.0) + constantes_dict_local.get('EZU_CGS', 0.0)) * perdas_val_qh
                     elif nome_tarifario_original == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * constantes_dict_local.get('G9_FA', 0.0) * perdas_val_qh + constantes_dict_local.get('G9_CGS', 0.0) + constantes_dict_local.get('G9_AC', 0.0))
                     elif nome_tarifario_original == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh + constantes_dict_local.get("Iberdrola_Dinamico_Q", 0.0) + constantes_dict_local.get('Iberdrola_mFRR', 0.0))
                     else: calculo_instantaneo_sem_perfil_qh = omie_val_qh * perdas_val_qh # Fallback
