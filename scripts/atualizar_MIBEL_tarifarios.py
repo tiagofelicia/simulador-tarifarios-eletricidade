@@ -119,7 +119,7 @@ def run_update_process():
 
         # 3a. Criar calendário base
         calendario_es = pd.DataFrame({
-            'Data': pd.date_range(start='2025-01-01', end='2027-12-31', freq='D')
+            'Data': pd.date_range(start='2026-01-01', end='2027-12-31', freq='D')
         })
         calendario_es['Ano'] = calendario_es['Data'].dt.year
         calendario_es['Mes'] = calendario_es['Data'].dt.month
@@ -242,8 +242,8 @@ def run_update_process():
         dados_finais_pt = dados_finais_es.sort_values('datetime_pt').copy()
         dados_finais_pt['Hora_PT'] = dados_finais_pt.groupby('Data_PT').cumcount() + 1
 
-        # Selecionar apenas 2025, 2026 e 2027
-        dados_finais_pt = dados_finais_pt[dados_finais_pt['datetime_pt'].dt.year.isin([2025, 2026, 2027])].copy()
+        # Selecionar apenas 2026 e 2027
+        dados_finais_pt = dados_finais_pt[dados_finais_pt['datetime_pt'].dt.year.isin([2026, 2027])].copy()
         dados_finais_pt = dados_finais_pt[['Data_PT', 'Hora_PT', 'Preco']].rename(
             columns={'Data_PT': 'Data', 'Hora_PT': 'Hora'}
         )
@@ -293,7 +293,7 @@ def run_update_process():
         #    Manter o 'index' original do Excel e o 'Preco'
         dados_para_escrever = df_final_excel.dropna(subset=['Preco'])[['index', 'Preco']]
         
-        print(f"   - {len(dados_para_escrever)} preços (2025/2026) alinhados e prontos a escrever.")
+        print(f"   - {len(dados_para_escrever)} preços (2026) alinhados e prontos a escrever.")
 
         # 7. Escrever no ficheiro Excel (de forma seletiva)
         print(f"   - A carregar '{FICHEIRO_EXCEL}' para escrita...")
