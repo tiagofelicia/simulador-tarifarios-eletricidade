@@ -2276,17 +2276,13 @@ with st.expander("➕ Opções Adicionais de Simulação (Tarifa Social e condic
             incluir_quota_acp = st.checkbox(
                 "Incluir Quota ACP",
                 key='chk_acp',
-                help="Inclui o valor da quota do ACP (4,80 €/mês) no valor do tarifário da parceria GE/ACP.",
+                help="Inclui o valor da quota do ACP (4,90 €/mês) no valor do tarifário da parceria GE/ACP.",
                 on_change=atualizar_url_opcoes_adicionais
             )
         with colx4:
             # Padrão simplificado
-            desconto_continente = st.checkbox(
-                "Desconto Continente",
-                key='chk_continente',
-                help="Comparar o custo total incluindo o desconto do valor do cupão Continente no tarifário Galp&Continente.",
-                on_change=atualizar_url_opcoes_adicionais
-            )
+            #desconto_continente = st.checkbox("Desconto Continente",key='chk_continente',help="Comparar o custo total incluindo o desconto do valor do cupão Continente no tarifário Galp&Continente.",on_change=atualizar_url_opcoes_adicionais)
+            desconto_continente = False
     else:
         incluir_quota_acp = st.session_state.get('chk_acp', True)
         desconto_continente = st.session_state.get('chk_continente', True)
@@ -2919,21 +2915,7 @@ modo_de_comparacao_ativo = st.checkbox(
 
 st.markdown("---") # Separador
 st.subheader("🔍 Filtros da Tabela de Resultados")
-
-# Botão para limpar filtros primeiro, para que a ação ocorra antes de ler os valores dos selectbox
-# Usaremos colunas para o layout do botão e do título de resultados
-col_titulo_resultados, col_btn_limpar = st.columns([3,1]) # Ajustar a proporção conforme necessário
-
-
-with col_btn_limpar:
-    if st.button("🧹 Remover Todos os Filtros", key="btn_remover_filtros_gerais_tabela", use_container_width=True):
-        keys_filtros_a_resetar = ["filter_segmentos_multi", "filter_tipos_multi", 
-                                  "filter_faturacao_multi", "filter_pagamento_multi"] # Nomes das chaves para multiselect
-        for k_f in keys_filtros_a_resetar:
-            if k_f in st.session_state:
-                st.session_state[k_f] = [] # Reset para lista vazia para multiselect
-        st.rerun()
-
+# --- INÍCIO: FILTROS PARA A TABELA DE RESULTADOS ---
 filt_col1, filt_col2, filt_col3, filt_col4 = st.columns(4)
 
 # --- Filtro de Segmento ---
@@ -3047,7 +3029,7 @@ if selected_pagamento_user != "Todos":
     ti_processar = ti_processar[ti_processar['pagamento'].astype(str).str.strip().isin(pagamento_para_filtrar)]
 
 
-st.markdown("---")
+#st.markdown("---")
 # FIM Seletor de Modo de Visualização - NORMAL OU OPÇÃO HORÁRIA
 # --- Construir Resumo dos Inputs para Exibição ---
 cor_texto_resumo = "#333333"  # Um cinza escuro, bom para fundos claros
@@ -4246,7 +4228,7 @@ if modo_de_comparacao_ativo:
                             elif "Total Bi-horário - Ciclo Semanal (€)" in col_nome_iter_width :
                                  worksheet_excel.column_dimensions[col_letra_iter].width = 33    
                             elif "Total Tri-horário - Ciclo Diário (€)" in col_nome_iter_width :
-                             worksheet_excel.column_dimensions[col_letra_iter].width = 33    
+                                worksheet_excel.column_dimensions[col_letra_iter].width = 33    
                             elif "Total Tri-horário - Ciclo Semanal (€)" in col_nome_iter_width :
                                  worksheet_excel.column_dimensions[col_letra_iter].width = 33    
                             else: 
@@ -4359,7 +4341,7 @@ if modo_de_comparacao_ativo:
         # --- FIM DO EXPANDER DE EXPORTAÇÃO DA TABELA COMPARATIVA ---
 
 else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários de Eletricidade - Detalhado) ---
-    st.markdown("---")
+    #st.markdown("---")
 
     # --- Comparar Tarifários Fixos ---
     tarifarios_filtrados_fixos = tf_processar[
@@ -5467,7 +5449,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
         key="chk_vista_simplificada"
         )
 
-    st.write("**Total** com todos os componentes, taxas e impostos e **valores unitários** de **Energia e Potência** sem IVA")
+    st.write("**Total** com todos os componentes, taxas e impostos. **Valores unitários** de **Energia e Potência** sem IVA.")
     st.write("**O nome do tarifário tem link para mais informações/adesão sobre o mesmo.**")
 
     st.markdown("➡️ [**Exportar Tabela Detalhada para Excel**](#exportar-excel-detalhada)")
@@ -6622,7 +6604,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
             # ---- FIM DA CONFIGURAÇÃO DO AGGRID ----
 
         st.markdown("<a id='exportar-excel-detalhada'></a>", unsafe_allow_html=True)
-        st.markdown("---")
+        #st.markdown("---")
         with st.expander("📥 Exportar Tabela Detalhada para Excel"):
             colunas_dados_tooltip_a_ocultar = [
                 'info_notas', 'LinkAdesao',
