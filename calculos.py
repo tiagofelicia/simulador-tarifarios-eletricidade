@@ -1209,7 +1209,7 @@ def calcular_detalhes_custo_tarifario_indexado(
                 
                 # Lógica de PERDAS (deve usar perdas_medias_dict_global e o ciclo_real_oh_destino)
                 perdas_a_usar_val_media = 1.0 # Default
-                if nome_tarifario_original in ["LUZiGÁS - Energy 8.8", "LUZiGÁS - Super Lig Index", "Ibelectra - Solução Família"]:
+                if nome_tarifario_original in ["LUZiGÁS - Energy 8.8", "LUZiGÁS - Super Lig Index", "Ibelectra - Solução Família", "Ibelectra - Solução Amigo"]:
                     # Perdas Anuais por período da opção de destino
                     chave_perda_anual = f'Perdas_Anual_{ciclo_real_oh_destino}_{p_key_destino}' if ciclo_real_oh_destino != "S" else 'Perdas_Anual_S'
                     perdas_a_usar_val_media = perdas_medias_dict_global.get(chave_perda_anual, 1.0)
@@ -1244,6 +1244,8 @@ def calcular_detalhes_custo_tarifario_indexado(
                     temp_preco_calculado = calc_base_luzigas * perdas_a_usar_val_media
                 elif nome_tarifario_original == "Ibelectra - Solução Família": # Usa OMIE do input user p/ período destino
                     temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * perdas_a_usar_val_media + constantes_dict_local.get('Ibelectra_K', 0.0)
+                elif nome_tarifario_original == "Ibelectra - Solução Amigo": # Usa OMIE do input user p/ período destino
+                    temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * perdas_a_usar_val_media + constantes_dict_local.get('Ibelectra_K_a', 0.0)
                 elif nome_tarifario_original == "G9 - Smart Index": # Usa OMIE do input user p/ período destino
                     temp_preco_calculado = (omie_kwh_a_usar_na_formula * constantes_dict_local.get('G9_FA', 1.02) * perdas_a_usar_val_media) + constantes_dict_local.get('G9_CGS', 0.01) + constantes_dict_local.get('G9_AC', 0.0055)
                 elif nome_tarifario_original == "EDP - Eletricidade Indexada Média": # Usa OMIE do input user p/ período destino

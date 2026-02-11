@@ -5008,6 +5008,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                             elif nome_tarifario == "LUZiGÁS - Energy 8.8": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Luzigas_8_8_K', 0.0) + constantes.get('Luzigas_CGS', 0.0)) * perdas_a_usar, prec)
                             elif nome_tarifario == "LUZiGÁS - Super Lig Index": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Luzigas_K', 0.0) + constantes.get('Luzigas_CGS', 0.0)) * perdas_a_usar, prec)
                             elif nome_tarifario == "Ibelectra - Solução Família": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Ibelectra_CS', 0.0)) * perdas_a_usar + constantes.get('Ibelectra_K', 0.0), prec)
+                            elif nome_tarifario == "Ibelectra - Solução Amigo": preco_energia_simples_indexado = round((omie_a_usar + constantes.get('Ibelectra_CS', 0.0)) * perdas_a_usar + constantes.get('Ibelectra_K_a', 0.0), prec)
                             elif nome_tarifario == "G9 - Smart Index": preco_energia_simples_indexado = round((omie_a_usar * constantes.get('G9_FA', 1.02)) * perdas_medias.get('Perdas_M_S', 1.16) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec)
                             elif nome_tarifario == "EDP - Eletricidade Indexada Média": preco_energia_simples_indexado = round(omie_a_usar * constantes.get('EDP_M_Perdas', 1.0) * constantes.get('EDP_M_K1', 1.0) + constantes.get('EDP_M_K2', 0.0), prec)
                             else: st.warning(f"Fórmula não definida para tarifário médio Simples: {nome_tarifario}"); preco_energia_simples_indexado = omie_a_usar
@@ -5019,6 +5020,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                             elif nome_tarifario == "LUZiGÁS - Super Lig Index": k_luzigas = constantes.get('Luzigas_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_fora_vazio_indexado = round(calc_base * perdas_f_anual, prec)
                             elif nome_tarifario == "Endesa - Tarifa Indexada": preco_energia_vazio_indexado = round(omie_v_a_usar + constantes.get('Endesa_A_V', 0.0), prec); preco_energia_fora_vazio_indexado = round(omie_f_a_usar + constantes.get('Endesa_A_FV', 0.0), prec)
                             elif nome_tarifario == "Ibelectra - Solução Família": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_fora_vazio_indexado = round((omie_f_a_usar + cs_ib) * perdas_f_anual + k_ib, prec)                    
+                            elif nome_tarifario == "Ibelectra - Solução Amigo": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K_a', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_fora_vazio_indexado = round((omie_f_a_usar + cs_ib) * perdas_f_anual + k_ib, prec)                    
                             elif nome_tarifario == "G9 - Smart Index": preco_energia_vazio_indexado = round((omie_v_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_bi}_V', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec); preco_energia_fora_vazio_indexado = round((omie_f_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_bi}_F', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec)                    
                             elif nome_tarifario == "EDP - Eletricidade Indexada Média": perdas_const_edp = constantes.get('EDP_M_Perdas', 1.0); k1_edp = constantes.get('EDP_M_K1', 1.0); k2_edp = constantes.get('EDP_M_K2', 0.0); preco_energia_vazio_indexado = round(omie_v_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_fora_vazio_indexado = round(omie_f_a_usar * perdas_const_edp * k1_edp + k2_edp, prec)
                             else: st.warning(f"Fórmula não definida para tarifário médio Bi-horário: {nome_tarifario}"); preco_energia_vazio_indexado = omie_v_a_usar; preco_energia_fora_vazio_indexado = omie_f_a_usar
@@ -5028,6 +5030,7 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
                             if nome_tarifario == "LUZiGÁS - Energy 8.8": k_luzigas = constantes.get('Luzigas_8_8_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_cheias_indexado = round(calc_base * perdas_c_anual, prec); preco_energia_ponta_indexado = round(calc_base * perdas_p_anual, prec)
                             elif nome_tarifario == "LUZiGÁS - Super Lig Index": k_luzigas = constantes.get('Luzigas_K', 0.0); cgs_luzigas = constantes.get('Luzigas_CGS', 0.0); calc_base = omie_medio_simples_real_kwh + k_luzigas + cgs_luzigas; preco_energia_vazio_indexado = round(calc_base * perdas_v_anual, prec); preco_energia_cheias_indexado = round(calc_base * perdas_c_anual, prec); preco_energia_ponta_indexado = round(calc_base * perdas_p_anual, prec)
                             elif nome_tarifario == "Ibelectra - Solução Família": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_cheias_indexado = round((omie_c_a_usar + cs_ib) * perdas_c_anual + k_ib, prec); preco_energia_ponta_indexado = round((omie_p_a_usar + cs_ib) * perdas_p_anual + k_ib, prec)
+                            elif nome_tarifario == "Ibelectra - Solução Amigo": cs_ib = constantes.get('Ibelectra_CS', 0.0); k_ib = constantes.get('Ibelectra_K_a', 0.0); preco_energia_vazio_indexado = round((omie_v_a_usar + cs_ib) * perdas_v_anual + k_ib, prec); preco_energia_cheias_indexado = round((omie_c_a_usar + cs_ib) * perdas_c_anual + k_ib, prec); preco_energia_ponta_indexado = round((omie_p_a_usar + cs_ib) * perdas_p_anual + k_ib, prec)
                             elif nome_tarifario == "G9 - Smart Index": preco_energia_vazio_indexado = round((omie_v_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_tri}_V', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec); preco_energia_cheias_indexado = round((omie_c_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_tri}_C', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec); preco_energia_ponta_indexado = round((omie_p_a_usar * constantes.get('G9_FA', 1.02) * perdas_medias.get(f'Perdas_M_{ciclo_tri}_P', 1.16)) + constantes.get('G9_CGS', 0.01) + constantes.get('G9_AC', 0.0055), prec) 
                             elif nome_tarifario == "EDP - Eletricidade Indexada Média": perdas_const_edp = constantes.get('EDP_M_Perdas', 1.0); k1_edp = constantes.get('EDP_M_K1', 1.0); k2_edp = constantes.get('EDP_M_K2', 0.0); preco_energia_vazio_indexado = round(omie_v_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_cheias_indexado = round(omie_c_a_usar * perdas_const_edp * k1_edp + k2_edp, prec); preco_energia_ponta_indexado = round(omie_p_a_usar * perdas_const_edp * k1_edp + k2_edp, prec)
                             else: st.warning(f"Fórmula não definida para tarifário médio Tri-horário: {nome_tarifario}"); preco_energia_vazio_indexado = omie_v_a_usar; preco_energia_cheias_indexado = omie_c_a_usar; preco_energia_ponta_indexado = omie_p_a_usar
@@ -5860,21 +5863,21 @@ else: # --- INÍCIO DO BLOCO PARA TABELA DETALHADA (Tiago Felícia - Tarifários
 
                 const normalized_value = Math.max(0, Math.min(1, (value - min_val) / (max_val - min_val)));
                 // Cores alvo do Excel
-                const colorLow = {{ r: 90, g: 138, b: 198 }};  // Verde #63BE7B
+                const colorLow = {{ r: 90, g: 138, b: 198 }};  // Azul #5A8AC6
                 const colorMid = {{ r: 255, g: 255, b: 255 }}; // Branco #FFFFFF
-                const colorHigh = {{ r: 247, g: 150, b: 70 }}; // Vermelho #F8696B
+                const colorHigh = {{ r: 247, g: 150, b: 70 }}; // Laranja #F79646
 
                 let r, g, b;
 
                 if (normalized_value < 0.5) {{
-                    // Interpolar entre colorLow (Verde) e colorMid (Branco)
+                    // Interpolar entre colorLow (Azul) e colorMid (Branco)
                     // t vai de 0 (no min) a 1 (no meio)
                     const t = normalized_value / 0.5; 
                     r = Math.round(colorLow.r * (1 - t) + colorMid.r * t);
                     g = Math.round(colorLow.g * (1 - t) + colorMid.g * t);
                     b = Math.round(colorLow.b * (1 - t) + colorMid.b * t);
                 }} else {{
-                    // Interpolar entre colorMid (Branco) e colorHigh (Vermelho)
+                    // Interpolar entre colorMid (Branco) e colorHigh (Laranja)
                     // t vai de 0 (no meio) a 1 (no max)
                     const t = (normalized_value - 0.5) / 0.5;
                     r = Math.round(colorMid.r * (1 - t) + colorHigh.r * t);
