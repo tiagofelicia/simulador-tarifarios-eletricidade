@@ -1243,9 +1243,9 @@ def calcular_detalhes_custo_tarifario_indexado(
                     calc_base_luzigas = omie_para_luzigas_kwh + constantes_dict_local.get('Luzigas_K', 0.0) + constantes_dict_local.get('Luzigas_CGS', 0.0)
                     temp_preco_calculado = calc_base_luzigas * perdas_a_usar_val_media
                 elif nome_tarifario_original == "Ibelectra - Solução Família": # Usa OMIE do input user p/ período destino
-                    temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * perdas_a_usar_val_media + constantes_dict_local.get('Ibelectra_K', 0.0)
+                    temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * constantes_dict_local.get('Ibelectra__Perdas', 0.0) + constantes_dict_local.get('Ibelectra_K', 0.0)
                 elif nome_tarifario_original == "Ibelectra - Solução Amigo": # Usa OMIE do input user p/ período destino
-                    temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * perdas_a_usar_val_media + constantes_dict_local.get('Ibelectra_K_a', 0.0)
+                    temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * constantes_dict_local.get('Ibelectra__Perdas', 0.0) + constantes_dict_local.get('Ibelectra_K_a', 0.0)
                 elif nome_tarifario_original == "G9 - Smart Index": # Usa OMIE do input user p/ período destino
                     temp_preco_calculado = (omie_kwh_a_usar_na_formula * constantes_dict_local.get('G9_FA', 1.02) * perdas_a_usar_val_media) + constantes_dict_local.get('G9_CGS', 0.01) + constantes_dict_local.get('G9_AC', 0.0055)
                 elif nome_tarifario_original == "EDP - Eletricidade Indexada Média": # Usa OMIE do input user p/ período destino
