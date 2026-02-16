@@ -410,6 +410,7 @@ def calcular_custo_completo_diagrama_carga(tarifario_idx, df_consumos_reais, df_
             elif "EDP - Eletricidade Indexada Horária" in nome_tarifario: return (omie_kwh * perdas * constantes_dict.get('EDP_H_K1', 1.0) + constantes_dict.get('EDP_H_K2', 0.0))
             elif "EZU - Indexada" in nome_tarifario: return (omie_kwh + constantes_dict.get('EZU_K', 0.0) + constantes_dict.get('EZU_CGS', 0.0)) * perdas
             elif "G9 - Smart Dynamic" in nome_tarifario: return (omie_kwh * constantes_dict.get('G9_FA', 0.0) * perdas + constantes_dict.get('G9_CGS', 0.0) + constantes_dict.get('G9_AC', 0.0))
+            elif "G9 - Smart Dynamic (Empresarial)" in nome_tarifario: return (omie_kwh * constantes_dict.get('G9_FA', 0.0) * perdas + constantes_dict.get('G9_CGS', 0.0) + constantes_dict.get('G9_AC', 0.0))
             elif "Iberdrola - Simples Indexado Dinâmico" in nome_tarifario: return (omie_kwh * perdas + constantes_dict.get("Iberdrola_Dinamico_Q", 0.0) + constantes_dict.get('Iberdrola_mFRR', 0.0))
             elif "Luzboa - BTN SPOTDEF" in nome_tarifario: return (omie_kwh + constantes_dict.get('Luzboa_CGS', 0.0)) * perdas * constantes_dict.get('Luzboa_FA', 1.0) + constantes_dict.get('Luzboa_Kp', 0.0)
             return omie_kwh * perdas
@@ -1129,6 +1130,7 @@ def calcular_detalhes_custo_tarifario_indexado(
                     elif nome_tarifario_original == "EDP - Eletricidade Indexada Horária": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('EDP_H_K1', 1.0) + constantes_dict_local.get('EDP_H_K2', 0.0))
                     elif nome_tarifario_original == "EZU - Indexada": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('EZU_K', 0.0) + constantes_dict_local.get('EZU_CGS', 0.0)) * perdas_val_qh
                     elif nome_tarifario_original == "G9 - Smart Dynamic": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * constantes_dict_local.get('G9_FA', 0.0) * perdas_val_qh + constantes_dict_local.get('G9_CGS', 0.0) + constantes_dict_local.get('G9_AC', 0.0))
+                    elif nome_tarifario_original == "G9 - Smart Dynamic (Empresarial)": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * constantes_dict_local.get('G9_FA', 0.0) * perdas_val_qh + constantes_dict_local.get('G9_CGS', 0.0) + constantes_dict_local.get('G9_AC', 0.0))
                     elif nome_tarifario_original == "Iberdrola - Simples Indexado Dinâmico": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh + constantes_dict_local.get("Iberdrola_Dinamico_Q", 0.0) + constantes_dict_local.get('Iberdrola_mFRR', 0.0))
                     else: calculo_instantaneo_sem_perfil_qh = omie_val_qh * perdas_val_qh # Fallback
 
@@ -1217,6 +1219,10 @@ def calcular_detalhes_custo_tarifario_indexado(
                     # Perdas do PERÍODO SELECIONADO por período da opção de destino
                     chave_perda_periodo = f'Perdas_M_{ciclo_real_oh_destino}_{p_key_destino}' if ciclo_real_oh_destino != "S" else 'Perdas_M_S'
                     perdas_a_usar_val_media = perdas_medias_dict_global.get(chave_perda_periodo, 1.0)
+                elif nome_tarifario_original == "G9 - Smart Index (Empresarial)":
+                    # Perdas do PERÍODO SELECIONADO por período da opção de destino
+                    chave_perda_periodo = f'Perdas_M_{ciclo_real_oh_destino}_{p_key_destino}' if ciclo_real_oh_destino != "S" else 'Perdas_M_S'
+                    perdas_a_usar_val_media = perdas_medias_dict_global.get(chave_perda_periodo, 1.0)
                 # Para outros, a lógica de perdas está nas fórmulas ou são constantes.
 
                 # --- Fórmulas específicas para Tarifários de Média ---
@@ -1247,6 +1253,8 @@ def calcular_detalhes_custo_tarifario_indexado(
                 elif nome_tarifario_original == "Ibelectra - Solução Amigo": # Usa OMIE do input user p/ período destino
                     temp_preco_calculado = (omie_kwh_a_usar_na_formula + constantes_dict_local.get('Ibelectra_CS', 0.0)) * constantes_dict_local.get('Ibelectra_Perdas', 0.0) + constantes_dict_local.get('Ibelectra_K_a', 0.0)
                 elif nome_tarifario_original == "G9 - Smart Index": # Usa OMIE do input user p/ período destino
+                    temp_preco_calculado = (omie_kwh_a_usar_na_formula * constantes_dict_local.get('G9_FA', 1.02) * perdas_a_usar_val_media) + constantes_dict_local.get('G9_CGS', 0.01) + constantes_dict_local.get('G9_AC', 0.0055)
+                elif nome_tarifario_original == "G9 - Smart Index (Empresarial)": # Usa OMIE do input user p/ período destino
                     temp_preco_calculado = (omie_kwh_a_usar_na_formula * constantes_dict_local.get('G9_FA', 1.02) * perdas_a_usar_val_media) + constantes_dict_local.get('G9_CGS', 0.01) + constantes_dict_local.get('G9_AC', 0.0055)
                 elif nome_tarifario_original == "EDP - Eletricidade Indexada Média": # Usa OMIE do input user p/ período destino
                     temp_preco_calculado = omie_kwh_a_usar_na_formula * constantes_dict_local.get('EDP_M_Perdas', 1.0) * constantes_dict_local.get('EDP_M_K1', 1.0) + constantes_dict_local.get('EDP_M_K2', 0.0)
