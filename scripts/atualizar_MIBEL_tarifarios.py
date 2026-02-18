@@ -6,6 +6,9 @@ import openpyxl
 from datetime import datetime
 import io
 import re
+import os
+import json
+import hashlib
 
 print("✅ Bibliotecas carregadas")
 
@@ -16,6 +19,10 @@ FICHEIRO_EXCEL = "Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx"
 ABA_EXCEL = "OMIE_PERDAS_CICLOS"
 COLUNA_PARA_ESCREVER = 11 # Coluna K
 FICHEIRO_MIBEL_CSV = "data/MIBEL_ano_atual_ACUM.csv"
+
+# CSVs individuais (espelham as abas do Excel para o simulador)
+PASTA_CSV = "data/csv"
+ABAS_PARA_CSV = ["Constantes", "Tarifarios_fixos", "Indexados", "OMIE_PERDAS_CICLOS"]
 
 print(f"ℹ️ Fonte de dados: '{FICHEIRO_MIBEL_CSV}'")
 print("⚠️ Dados OMIE e futuros")
@@ -321,6 +328,33 @@ def run_update_process():
 
         wb.save(FICHEIRO_EXCEL)
         print(f"✅ O ficheiro Excel foi atualizado com sucesso!\n   Data_Valores_OMIE = {ultima_data_omie.date()}\n   Data_Valores_OMIP = {data_relatorio_omip.date()}")
+
+        # ============================================================
+        # PASSO 6: Exportar abas do Excel como CSVs individuais
+        # ============================================================
+
+        print(f"\n⏳ Passo 6: A exportar abas do Excel como CSVs individuais...")
+        os.makedirs(PASTA_CSV, exist_ok=True)
+
+        manifest = {}
+        for aba in ABAS_PARA_CSV:
+            try:
+                df_aba = pd.read_excel(FICHEIRO_EXCEL, sheet_name=aba)
+                csv_path = os.path.join(PASTA_CSV, f"{aba}.csv")
+                df_aba.to_csv(csv_path, index=False, encoding='utf-8-sig')
+                # Gerar hash MD5 do conteúdo para o manifest
+                with open(csv_path, 'rb') as f:
+                    manifest[aba] = hashlib.md5(f.read()).hexdigest()[:8]
+                print(f"   ✅ {aba}.csv ({len(df_aba)} registos) [{manifest[aba]}]")
+            except Exception as e:
+                print(f"   ❌ Falha ao exportar '{aba}': {e}")
+
+        # Gerar manifest.json para validação de cache no simulador
+        manifest_path = os.path.join(PASTA_CSV, "manifest.json")
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(manifest, f)
+        print(f"   ✅ manifest.json gerado: {manifest}")
+        print("✅ Exportação de CSVs concluída.")
 
     except Exception as e:
         import traceback
