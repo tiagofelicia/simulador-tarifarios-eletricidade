@@ -17580,3 +17580,104 @@
    ✅ manifest.json gerado: {'Constantes': 'ebd6bc90', 'Tarifarios_fixos': '2240807d', 'Indexados': '149e9dd7', 'OMIE_PERDAS_CICLOS': 'cabe961f'}
 ✅ Exportação de CSVs concluída.
 === FASE 2 (TARIFÁRIOS) TERMINADA: Mon Feb 23 13:39:35 UTC 2026 ===
+=== FASE 1 (MIBEL CSV) INICIADA: Mon Feb 23 19:58:54 UTC 2026 ===
+
+🔵 🚀 A iniciar atualização MIBEL
+
+🔵 [LIVE] A extrair dados ACUM + INDICADORES
+       • [ACUM] A descarregar…
+       • [ACUM] OK (384 registos)
+       • [ACUM] Intervalo temporal: 2026-02-21 → 2026-02-24
+       • [INDICADORES] A descarregar…
+       • [INDICADORES] ❌ Falhou (HTTPSConnectionPool(host='www.omie.es', port=443): Read timed out. (read timeout=10))
+
+🔵 [HISTÓRICO] A carregar histórico local
+   - ✔️ CSV carregado (35617 registos)
+
+🔵 [PLANO B] ACUM insuficiente (4 dias)
+   - Última data na base consolidada: 2026-02-24
+
+🔵 [FINAL] A combinar e guardar
+   - ℹ️ Backup ignorado (GitHub Actions)
+   - ✅ Atualização concluída: 35617 registos
+   -    📅 Dados de: 2025-02-18 até 2026-02-24
+   - 🏁 FIM
+=== FASE 1 (MIBEL CSV) TERMINADA: Mon Feb 23 19:59:21 UTC 2026 ===
+=== FASE 2 (TARIFÁRIOS) INICIADA: Mon Feb 23 19:59:21 UTC 2026 ===
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+               ^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/http/client.py", line 1395, in getresponse
+    response.begin()
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/http/client.py", line 325, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/http/client.py", line 286, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/socket.py", line 718, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/ssl.py", line 1314, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/ssl.py", line 1166, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/util/retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 536, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/urllib3/connectionpool.py", line 367, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='www.omip.pt', port=443): Read timed out. (read timeout=20)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/simulador-tarifarios-eletricidade/simulador-tarifarios-eletricidade/scripts/atualizar_MIBEL_tarifarios.py", line 42, in run_update_process
+    resposta_http = requests.get(url_omip_excel, timeout=20)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.11.14/x64/lib/python3.11/site-packages/requests/adapters.py", line 713, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='www.omip.pt', port=443): Read timed out. (read timeout=20)
+✅ Bibliotecas carregadas
+ℹ️ Fonte de dados: 'data/MIBEL_ano_atual_ACUM.csv'
+⚠️ Dados OMIE e futuros
+
+⏳ Passo 1: A extrair dados de futuros do ficheiro OMIPdaily.xlsx...
+❌ Ocorreu um erro inesperado: HTTPSConnectionPool(host='www.omip.pt', port=443): Read timed out. (read timeout=20)
+=== FASE 2 (TARIFÁRIOS) TERMINADA: Mon Feb 23 19:59:42 UTC 2026 ===
