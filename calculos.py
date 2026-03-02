@@ -400,7 +400,8 @@ def calcular_custo_completo_diagrama_carga(tarifario_idx, df_consumos_reais, df_
 
         def calcular_preco_comercializador_intervalo(row):
             omie_kwh = row['OMIE'] / 1000.0; perdas = row['Perdas']
-            if nome_tarifario == "Coopérnico Base 2.0": return (omie_kwh + constantes_dict.get('Coop_CS_CR', 0.0) + constantes_dict.get('Coop_K', 0.0)) * perdas
+            if nome_tarifario == "Coopérnico Base": return (omie_kwh + constantes_dict.get('Coop_CS_CR', 0.0) + constantes_dict.get('Coop_K', 0.0)) * perdas
+            elif nome_tarifario == "Coopérnico GO": return (omie_kwh + constantes_dict.get('Coop_CS_CR', 0.0) + constantes_dict.get('Coop_K', 0.0)) * perdas + constantes_dict.get('Coop_GO', 0.0)
             elif "Repsol - Leve PRO Sem Mais" in nome_tarifario: return (omie_kwh * perdas * constantes_dict.get('Repsol_FA', 0.0) + constantes_dict.get('Repsol_Q_Tarifa_Pro', 0.0))
             elif "Repsol - Leve Sem Mais" in nome_tarifario: return (omie_kwh * perdas * constantes_dict.get('Repsol_FA', 0.0) + constantes_dict.get('Repsol_Q_Tarifa', 0.0))
             elif "Galp - Plano Flexível / Dinâmico" in nome_tarifario: return (omie_kwh + constantes_dict.get('Galp_Ci', 0.0)) * perdas
@@ -1120,7 +1121,8 @@ def calcular_detalhes_custo_tarifario_indexado(
 
                     calculo_instantaneo_sem_perfil_qh = 0.0
                     # --- Fórmulas específicas BTN (Quarto-Horário) ---
-                    if nome_tarifario_original == "Coopérnico Base 2.0": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Coop_CS_CR', 0.0) + constantes_dict_local.get('Coop_K', 0.0)) * perdas_val_qh
+                    if nome_tarifario_original == "Coopérnico Base": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Coop_CS_CR', 0.0) + constantes_dict_local.get('Coop_K', 0.0)) * perdas_val_qh
+                    elif nome_tarifario_original == "Coopérnico GO": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Coop_CS_CR', 0.0) + constantes_dict_local.get('Coop_K', 0.0)) * perdas_val_qh + constantes_dict_local.get('Coop_GO', 0.0)
                     elif nome_tarifario_original == "Repsol - Leve Sem Mais": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('Repsol_FA', 0.0) + constantes_dict_local.get('Repsol_Q_Tarifa', 0.0))
                     elif nome_tarifario_original == "Repsol - Leve PRO Sem Mais": calculo_instantaneo_sem_perfil_qh = (omie_val_qh * perdas_val_qh * constantes_dict_local.get('Repsol_FA', 0.0) + constantes_dict_local.get('Repsol_Q_Tarifa_Pro', 0.0))
                     elif nome_tarifario_original == "Galp - Plano Flexível / Dinâmico": calculo_instantaneo_sem_perfil_qh = (omie_val_qh + constantes_dict_local.get('Galp_Ci', 0.0)) * perdas_val_qh
