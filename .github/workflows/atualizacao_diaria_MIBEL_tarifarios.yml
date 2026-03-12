@@ -18,7 +18,10 @@ on:
     - cron: '00 19 * * 1-5'
 
   workflow_dispatch: # Permite execução manual
-
+  
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
 jobs:
   run-python-job:
     name: Executar Atualização MIBEL em Tarifários
