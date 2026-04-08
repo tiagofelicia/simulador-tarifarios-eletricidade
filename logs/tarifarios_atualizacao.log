@@ -27883,3 +27883,77 @@ requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='www.omip.pt', port=44
    ✅ manifest.json gerado: {'Constantes': '3732bfe3', 'Tarifarios_fixos': '1228787b', 'Indexados': '9613cfd0', 'OMIE_PERDAS_CICLOS': 'a5b62df0'}
 ✅ Exportação de CSVs concluída.
 === FASE 2 (TARIFÁRIOS) TERMINADA: Wed Apr  8 11:05:20 UTC 2026 ===
+=== FASE 1 (MIBEL CSV) INICIADA: Wed Apr  8 13:01:36 UTC 2026 ===
+
+🔵 🚀 A iniciar atualização MIBEL
+
+🔵 [LIVE] A extrair dados ACUM + INDICADORES
+       • [ACUM] A descarregar…
+       • [ACUM] OK (35137 registos)
+       • [ACUM] Intervalo temporal: 2025-04-08 → 2026-04-09
+       • [INDICADORES] A descarregar…
+       • [INDICADORES] OK, dia 2026-04-09 (96 registos)
+
+🔵 [HISTÓRICO] A carregar histórico local
+   - ✔️ CSV carregado (35233 registos)
+
+🔵 [PLANO A] ACUM válido — usar como base principal
+   - ⚠️ A recuperar 96 registos do local (gap entre ACUM e Hoje)...
+   -    Dias recuperados: [datetime.date(2026, 4, 9)]
+   - Última data na base consolidada: 2026-04-09
+   - INDICADORES disponível para: 2026-04-09
+   - ✅ O dia dos INDICADORES (2026-04-09) já foi integrado via Download Live.
+
+🔵 [FINAL] A combinar e guardar
+   - ℹ️ Backup ignorado (GitHub Actions)
+   - ✅ Atualização concluída: 35137 registos
+   -    📅 Dados de: 2025-04-08 até 2026-04-09
+   - 🏁 FIM
+=== FASE 1 (MIBEL CSV) TERMINADA: Wed Apr  8 13:01:40 UTC 2026 ===
+=== FASE 2 (TARIFÁRIOS) INICIADA: Wed Apr  8 13:01:42 UTC 2026 ===
+/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/site-packages/openpyxl/styles/stylesheet.py:241: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+/opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/site-packages/openpyxl/styles/stylesheet.py:241: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+✅ Bibliotecas carregadas
+ℹ️ Fonte de dados: 'data/MIBEL_ano_atual_ACUM.csv'
+⚠️ Dados OMIE e futuros
+
+⏳ Passo 1: A extrair dados de futuros do ficheiro OMIPdaily.xlsx...
+   - Data do relatório OMIP extraída: 2026-04-07
+✅ Dados de futuros extraídos e processados.
+
+⏳ Passo 2: A ler dados históricos do 'data/MIBEL_ano_atual_ACUM.csv'...
+✅ 35137 registos históricos lidos com sucesso.
+
+⏳ Passo 3: A criar calendário e aplicar futuros...
+   - A preparar futuros (diários, semanais, mensais, trimestrais)...
+   - A fazer merge dos futuros...
+   - A propagar futuros dentro dos períodos (fill)...
+   - A juntar dados históricos reais...
+   - A aplicar hierarquia de preços...
+✅ Preços diários (reais e projetados) calculados.
+   - A criar grelha quarto-horária futura...
+✅ Estrutura ES criada com número correto de quartos-horários.
+
+⏳ Passo 4: A converter para hora de Portugal...
+✅ 35132 registos finais (em PT) preparados.
+
+⏳ Passo 5: A preparar dados para o ficheiro 'Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx'...
+   - A ler a pauta de tempo da aba 'OMIE_PERDAS_CICLOS' para alinhamento...
+   - A alinhar preços calculados com a pauta do Excel...
+   - 35040 preços (2026) alinhados e prontos a escrever.
+   - A carregar 'Tarifarios_🔌_Eletricidade_Tiago_Felicia.xlsx' para escrita...
+   - A escrever 35040 preços na Coluna 11 (K)...
+✅ O ficheiro Excel foi atualizado com sucesso!
+   Data_Valores_OMIE = 2026-04-09
+   Data_Valores_OMIP = 2026-04-07
+
+⏳ Passo 6: A exportar abas do Excel como CSVs individuais...
+   ✅ Constantes.csv (90 registos) [3732bfe3]
+   ✅ Tarifarios_fixos.csv (2407 registos) [1228787b]
+   ✅ Indexados.csv (1046 registos) [9613cfd0]
+   ✅ OMIE_PERDAS_CICLOS.csv (70176 registos) [a5b62df0]
+   ✅ manifest.json gerado: {'Constantes': '3732bfe3', 'Tarifarios_fixos': '1228787b', 'Indexados': '9613cfd0', 'OMIE_PERDAS_CICLOS': 'a5b62df0'}
+✅ Exportação de CSVs concluída.
+=== FASE 2 (TARIFÁRIOS) TERMINADA: Wed Apr  8 13:02:32 UTC 2026 ===
